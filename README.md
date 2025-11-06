@@ -43,7 +43,23 @@ This project creates a Cloudflare Worker that automatically checks your Movember
 8. Name it `CACHE` and click **"Add"**
 9. Click **"Save"**
 
-### Step 5: Update Your Movember URL
+### Step 5: Configure wrangler.jsonc
+
+Add the following bindings to your `wrangler.jsonc` file:
+
+```jsonc
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "your-kv-namespace-id"
+    }
+  ]
+}
+```
+
+Replace `your-kv-namespace-id` with the ID from your KV namespace (found in the Cloudflare Dashboard).
+
+### Step 6: Update Your Movember URL
 
 1. In your forked repository on GitHub, go to `src/index.ts`
 2. Click the pencil icon to edit the file

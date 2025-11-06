@@ -15,5 +15,11 @@ export const CACHE_TTL = 300000; // 5 minutes in milliseconds
 export const SUBDOMAIN_CACHE_TTL = 86400000; // 24 hours in milliseconds (subdomain mappings don't change often)
 export const MAX_RETRIES = 3;
 export const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff in milliseconds
-export const ALLORIGINS_PROXY = "https://api.allorigins.win/get";
+
+// Use the Worker's own proxy endpoint instead of external service
+// This will be set dynamically based on the current origin
+export function getProxyUrl() {
+  // Use the current origin (the Worker's domain) for the proxy
+  return `${window.location.origin}/proxy`;
+}
 

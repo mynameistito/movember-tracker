@@ -8,6 +8,81 @@ export default {
     console.log(`[REQUEST] ${method} ${pathname} from ${url.origin}`);
 
     try {
+      // CORS proxy endpoint for fetching Movember pages
+      if (pathname === "/proxy") {
+        const targetUrl = url.searchParams.get("url");
+        
+        if (!targetUrl) {
+          return new Response(
+            JSON.stringify({ error: "Missing 'url' query parameter" }),
+            {
+              status: 400,
+              headers: {
+                "content-type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          );
+        }
+
+        try {
+          console.log(`[PROXY] Fetching: ${targetUrl}`);
+          const response = await fetch(targetUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const html = await response.text();
+          
+          return new Response(html, {
+            status: 200,
+            headers: {
+              "content-type": "text/html; charset=UTF-8",
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, OPTIONS",
+              "Access-Control-Allow-Headers": "Content-Type",
+            },
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`[PROXY] Error fetching ${targetUrl}:`, errorMessage);
+          
+          return new Response(
+            JSON.stringify({
+              error: "Failed to fetch URL",
+              message: errorMessage,
+            }),
+            {
+              status: 500,
+              headers: {
+                "content-type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          );
+        }
+      }
+
+      // Handle OPTIONS requests for CORS preflight
+      if (method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Max-Age": "86400",
+          },
+        });
+      }
+
       // Route handling - redirect to HTML files
       if (pathname === "/json") {
         // Redirect to JSON endpoint HTML page

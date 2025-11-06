@@ -6,7 +6,7 @@ import {
   SUBDOMAIN_CACHE_TTL,
   MAX_RETRIES,
   RETRY_DELAYS,
-  ALLORIGINS_PROXY,
+  getProxyUrl,
 } from './constants.js';
 import { parseAmount, isValidNumber, calculatePercentage } from './parsing.js';
 import { formatDuration, sleep } from './formatting.js';
@@ -24,17 +24,37 @@ function extractSubdomainFromUrl(url) {
   return match ? match[1] : null;
 }
 
-// Helper function to fetch HTML using allOrigins proxy
+// Helper function to fetch HTML using Worker's CORS proxy
 async function fetchViaProxy(url) {
-  const proxyUrl = `${ALLORIGINS_PROXY}?url=${encodeURIComponent(url)}`;
+  const proxyUrl = `${getProxyUrl()}?url=${encodeURIComponent(url)}`;
   const response = await fetch(proxyUrl);
   
   if (!response.ok) {
-    throw new Error(`Proxy error! status: ${response.status}`);
+    // Try to get error message from response
+    let errorMessage = `Proxy error! status: ${response.status}`;
+    try {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const errorData = await response.json();
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } else {
+        const errorText = await response.text();
+        if (errorText) {
+          errorMessage = errorText.substring(0, 200); // Limit error message length
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors, use default error message
+      console.warn(`[PROXY] Could not parse error response:`, e);
+    }
+    throw new Error(errorMessage);
   }
   
-  const data = await response.json();
-  return data.contents; // HTML content from Movember
+  // Worker proxy returns HTML directly
+  const html = await response.text();
+  return html;
 }
 
 // Helper function to detect subdomain by following redirects

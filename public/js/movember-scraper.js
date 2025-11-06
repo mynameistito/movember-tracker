@@ -92,6 +92,17 @@ function detectSubdomainFromHtml(html) {
   if (html.match(/ZAR|South African Rand|South Africa/i)) {
     return 'za';
   }
+  // Kč for Czech Koruna
+  if (html.includes('Kč') || html.match(/CZK|Czech Koruna|Czech Republic|Czech/i)) {
+    return 'cz';
+  }
+  // kr for Danish Krone or Swedish Krona - check Swedish first, then Danish
+  if (html.match(/SEK|Swedish Krona|Sweden|Swedish/i)) {
+    return 'se';
+  }
+  if (html.includes('kr') || html.match(/DKK|Danish Krone|Denmark|Danish/i)) {
+    return 'dk';
+  }
   
   return null;
 }
@@ -120,7 +131,7 @@ async function detectSubdomainForMember(memberId, forceRefresh = false) {
   
   // Try to detect by checking common subdomains and their HTML content
   console.log(`[SUBDOMAIN] Detecting subdomain for memberId ${memberId}...`);
-  const commonSubdomains = ['uk', 'au', 'us', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it'];
+  const commonSubdomains = ['uk', 'au', 'us', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it', 'ex', 'cz', 'dk', 'se'];
   
   try {
     // Try common subdomains and check for currency indicators

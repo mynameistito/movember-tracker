@@ -31,6 +31,10 @@ export const SUBDOMAIN_CURRENCY_MAP = {
   "fr": "EUR",  // France - Euro
   "es": "EUR",  // Spain - Euro
   "it": "EUR",  // Italy - Euro
+  "ex": "EUR",  // Unknown/Experimental - Euro (default)
+  "cz": "CZK",  // Czech Republic - Czech Koruna
+  "dk": "DKK",  // Denmark - Danish Krone
+  "se": "SEK",  // Sweden - Swedish Krona
 };
 
 // Helper function to get currency code from subdomain
@@ -52,6 +56,9 @@ const CURRENCY_SYMBOL_MAP = {
   "EUR": "€",  // Euro
   "JPY": "¥",  // Japanese Yen
   "ZAR": "R",  // South African Rand
+  "CZK": "Kč", // Czech Koruna
+  "DKK": "kr", // Danish Krone
+  "SEK": "kr", // Swedish Krona
 };
 
 // Helper function to get currency symbol from currency code

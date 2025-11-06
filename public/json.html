@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movember Donation Tracker - JSON API</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    pre {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+      color: #4CAF50;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .error {
+      color: #ff4444;
+      background: rgba(255, 68, 68, 0.1);
+      border: 1px solid #ff4444;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .loading {
+      color: #4CAF50;
+      text-align: center;
+      padding: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="content">
+      <div class="loading">Loading...</div>
+    </div>
+  </div>
+  <script type="module">
+    import { getData } from './js/movember-scraper.js';
+    import { DEFAULT_MEMBER_ID } from './js/constants.js';
+
+    // Get memberId from URL query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || DEFAULT_MEMBER_ID;
+    const grabLive = urlParams.has('grab-live');
+
+    async function loadData() {
+      const contentDiv = document.getElementById('content');
+      
+      try {
+        const { data } = await getData(memberId, grabLive);
+        
+        // Display as JSON
+        contentDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        
+        // Set content type header via meta tag (for browser display)
+        document.querySelector('meta[name="description"]') || document.createElement('meta');
+      } catch (error) {
+        contentDiv.innerHTML = `
+          <div class="error">
+            <h2>Error</h2>
+            <p>${error.message || 'Failed to fetch data'}</p>
+          </div>
+        `;
+      }
+    }
+
+    // Load data on page load
+    loadData();
+  </script>
+</body>
+</html>
+

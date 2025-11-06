@@ -1,6 +1,5 @@
-export interface Env {
-  CACHE: KVNamespace;
-}
+// Env interface no longer needed (no KV storage)
+// export interface Env {}
 
 export interface ScrapedData {
   amount: string;

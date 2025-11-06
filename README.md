@@ -98,3 +98,6 @@ Once deployed, your Worker will be available at:
 ## License
 
 MIT
+
+## Credits
+Made with AI.

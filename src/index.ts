@@ -242,23 +242,27 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
     // Look for the raised amount in the HTML
     // Try multiple patterns to find the data
     const raisedPatterns = [
-      // Pattern 1: Look for the CSS class with amount
+      // Pattern 1: Look for convertedAmount in AmountRaised object (most reliable)
+      /"AmountRaised"[^}]*"convertedAmount"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
+      // Pattern 2: Look for originalAmount in AmountRaised object
+      /"AmountRaised"[^}]*"originalAmount"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
+      // Pattern 3: Look for the CSS class with amount
       /donationProgress--amount__raised[^>]*>([^<]*\$([\d,]+(?:\.\d+)?)[^<]*)/i,
-      // Pattern 2: Look for the class followed by text content
+      // Pattern 4: Look for the class followed by text content
       /class="[^"]*donationProgress--amount__raised[^"]*"[^>]*>[\s\S]*?\$([\d,]+(?:\.\d+)?)/i,
-      // Pattern 3: Look for data attributes or JSON with proper number format
+      // Pattern 5: Look for data attributes or JSON with proper number format
       /"raised"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 4: Look for raisedAmount or similar
+      // Pattern 6: Look for raisedAmount or similar
       /"raisedAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 5: Look for currentAmount or similar
+      // Pattern 7: Look for currentAmount or similar
       /"currentAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 6: Look for amount in data attributes
+      // Pattern 8: Look for amount in data attributes
       /data-raised=["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 7: Look for amount in data-amount attribute
+      // Pattern 9: Look for amount in data-amount attribute
       /data-amount=["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 8: Support different currency formats (€, £, etc.)
+      // Pattern 10: Support different currency formats (€, £, etc.)
       /donationProgress--amount__raised[^>]*>([^<]*[€£$]([\d,]+(?:\.\d+)?)[^<]*)/i,
-      // Pattern 9: Look for currency codes (USD, EUR, GBP, etc.)
+      // Pattern 11: Look for currency codes (USD, EUR, GBP, etc.)
       /donationProgress--amount__raised[^>]*>([^<]*(?:USD|EUR|GBP|AUD)\s*([\d,]+(?:\.\d+)?)[^<]*)/i,
     ];
     
@@ -291,23 +295,25 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
     
     // Look for the target amount in the HTML
     const targetPatterns = [
-      // Pattern 1: Look for the CSS class with amount
-      /donationProgress--amount__target[^>]*>([^<]*\$([\d,]+(?:\.\d+)?)[^<]*)/i,
-      // Pattern 2: Look for the class followed by text content
-      /class="[^"]*donationProgress--amount__target[^"]*"[^>]*>[\s\S]*?\$([\d,]+(?:\.\d+)?)/i,
-      // Pattern 3: Look for data attributes or JSON with proper number format
-      /"target"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 4: Look for targetAmount or similar
+      // Pattern 1: Look for target.fundraising.value (most reliable)
+      /"target"[^}]*"fundraising"[^}]*"value"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
+      // Pattern 2: Look for targetAmount in JSON
       /"targetAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 5: Look for goal or similar
+      // Pattern 3: Look for the CSS class with amount
+      /donationProgress--amount__target[^>]*>([^<]*\$([\d,]+(?:\.\d+)?)[^<]*)/i,
+      // Pattern 4: Look for the class followed by text content
+      /class="[^"]*donationProgress--amount__target[^"]*"[^>]*>[\s\S]*?\$([\d,]+(?:\.\d+)?)/i,
+      // Pattern 5: Look for data attributes or JSON with proper number format
+      /"target"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 6: Look for goal or similar
       /"goal"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 6: Look for amount in data attributes
+      // Pattern 7: Look for amount in data attributes
       /data-target=["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 7: Look for amount in data-goal attribute
+      // Pattern 8: Look for amount in data-goal attribute
       /data-goal=["']?\$?([\d,]+(?:\.\d+)?)/i,
-      // Pattern 8: Support different currency formats (€, £, etc.)
+      // Pattern 9: Support different currency formats (€, £, etc.)
       /donationProgress--amount__target[^>]*>([^<]*[€£$]([\d,]+(?:\.\d+)?)[^<]*)/i,
-      // Pattern 9: Look for currency codes (USD, EUR, GBP, etc.)
+      // Pattern 10: Look for currency codes (USD, EUR, GBP, etc.)
       /donationProgress--amount__target[^>]*>([^<]*(?:USD|EUR|GBP|AUD)\s*([\d,]+(?:\.\d+)?)[^<]*)/i,
     ];
     
@@ -475,6 +481,91 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
       target: target || "NOT FOUND" 
     });
 
+    // Final aggressive search: Find all dollar amounts and check their context
+    if (!raised || !target) {
+      console.log(`[SCRAPE] Performing aggressive context-based search...`);
+      const allDollarMatches = [...html.matchAll(/\$([\d,]+(?:\.\d+)?)/g)];
+      console.log(`[SCRAPE] Found ${allDollarMatches.length} dollar amounts in HTML`);
+      
+      if (allDollarMatches.length > 0) {
+        // Score each dollar amount based on context
+        const scoredAmounts: Array<{ amount: string; score: number; raisedScore: number; targetScore: number; context: string }> = [];
+        
+        for (const match of allDollarMatches) {
+          const amount = match[1];
+          if (!isValidNumber(amount)) continue;
+          
+          const matchIndex = match.index!;
+          const contextStart = Math.max(0, matchIndex - 300);
+          const contextEnd = Math.min(html.length, matchIndex + match[0].length + 300);
+          const context = html.substring(contextStart, contextEnd).toLowerCase();
+          
+          let raisedScore = 0;
+          let targetScore = 0;
+          
+          // Score for raised amounts
+          if (/(?:raised|donated|collected|current|funds?|progress|amount\s*(?:raised|donated))/i.test(context)) {
+            raisedScore += 10;
+          }
+          if (/(?:has\s+raised|has\s+donated|has\s+collected|currently\s+raised)/i.test(context)) {
+            raisedScore += 5;
+          }
+          if (/\$[\d,]+(?:\.\d+)?\s*(?:raised|donated|collected)/i.test(context)) {
+            raisedScore += 8;
+          }
+          
+          // Score for target amounts
+          if (/(?:target|goal|aim|objective|of\s+\$)/i.test(context)) {
+            targetScore += 10;
+          }
+          if (/(?:target\s+(?:of|is)|goal\s+(?:of|is)|aim\s+(?:of|is))/i.test(context)) {
+            targetScore += 5;
+          }
+          if (/\$[\d,]+(?:\.\d+)?\s*(?:target|goal)/i.test(context)) {
+            targetScore += 8;
+          }
+          
+          // Store with both scores
+          if (raisedScore > 0 || targetScore > 0) {
+            scoredAmounts.push({ 
+              amount, 
+              score: Math.max(raisedScore, targetScore), 
+              raisedScore,
+              targetScore,
+              context: context.substring(0, 200) 
+            });
+          }
+        }
+        
+        // Sort by score and pick the best candidates
+        scoredAmounts.sort((a, b) => b.score - a.score);
+        
+        // Try to find raised amount
+        if (!raised && scoredAmounts.length > 0) {
+          // Look for amounts with raised-related context, sorted by raisedScore
+          const raisedCandidates = scoredAmounts
+            .filter(a => a.raisedScore > 0)
+            .sort((a, b) => b.raisedScore - a.raisedScore);
+          if (raisedCandidates.length > 0) {
+            raised = raisedCandidates[0].amount;
+            console.log(`[SCRAPE] Found raised amount via context search: ${raised} (raisedScore: ${raisedCandidates[0].raisedScore})`);
+          }
+        }
+        
+        // Try to find target amount
+        if (!target && scoredAmounts.length > 0) {
+          // Look for amounts with target-related context, sorted by targetScore
+          const targetCandidates = scoredAmounts
+            .filter(a => a.targetScore > 0)
+            .sort((a, b) => b.targetScore - a.targetScore);
+          if (targetCandidates.length > 0) {
+            target = targetCandidates[0].amount;
+            console.log(`[SCRAPE] Found target amount via context search: ${target} (targetScore: ${targetCandidates[0].targetScore})`);
+          }
+        }
+      }
+    }
+    
     // Final validation check - ensure raised is actually valid before using
     if (!raised || !isValidNumber(raised)) {
       // Debug: Try to find any dollar amounts in the HTML to help diagnose

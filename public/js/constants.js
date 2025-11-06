@@ -16,6 +16,53 @@ export const SUBDOMAIN_CACHE_TTL = 86400000; // 24 hours in milliseconds (subdom
 export const MAX_RETRIES = 3;
 export const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff in milliseconds
 
+// Mapping of subdomain codes to currency codes
+// Format: "subdomain": "CURRENCY_CODE"
+export const SUBDOMAIN_CURRENCY_MAP = {
+  "uk": "GBP",  // United Kingdom - British Pound
+  "au": "AUD",  // Australia - Australian Dollar
+  "us": "USD",  // United States - US Dollar
+  "ca": "CAD",  // Canada - Canadian Dollar
+  "nz": "NZD",  // New Zealand - New Zealand Dollar
+  "ie": "EUR",  // Ireland - Euro
+  "za": "ZAR",  // South Africa - South African Rand
+  "nl": "EUR",  // Netherlands - Euro
+  "de": "EUR",  // Germany - Euro
+  "fr": "EUR",  // France - Euro
+  "es": "EUR",  // Spain - Euro
+  "it": "EUR",  // Italy - Euro
+};
+
+// Helper function to get currency code from subdomain
+// Returns the currency code for the given subdomain, or defaults to AUD
+export function getCurrencyFromSubdomain(subdomain) {
+  if (!subdomain) {
+    return "AUD"; // Default currency
+  }
+  return SUBDOMAIN_CURRENCY_MAP[subdomain.toLowerCase()] || "AUD";
+}
+
+// Mapping of currency codes to currency symbols
+const CURRENCY_SYMBOL_MAP = {
+  "USD": "$",  // US Dollar
+  "AUD": "$",  // Australian Dollar
+  "CAD": "$",  // Canadian Dollar
+  "NZD": "$",  // New Zealand Dollar
+  "GBP": "£",  // British Pound
+  "EUR": "€",  // Euro
+  "JPY": "¥",  // Japanese Yen
+  "ZAR": "R",  // South African Rand
+};
+
+// Helper function to get currency symbol from currency code
+// Returns the currency symbol for the given currency code, or defaults to "$"
+export function getCurrencySymbol(currencyCode) {
+  if (!currencyCode) {
+    return "$"; // Default symbol
+  }
+  return CURRENCY_SYMBOL_MAP[currencyCode.toUpperCase()] || "$";
+}
+
 // Use the Worker's own proxy endpoint instead of external service
 // This will be set dynamically based on the current origin
 export function getProxyUrl() {

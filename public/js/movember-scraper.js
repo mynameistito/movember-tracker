@@ -7,6 +7,7 @@ import {
   MAX_RETRIES,
   RETRY_DELAYS,
   getProxyUrl,
+  getCurrencySymbol,
 } from './constants.js';
 import { parseAmount, isValidNumber, calculatePercentage } from './parsing.js';
 import { formatDuration, sleep } from './formatting.js';
@@ -547,14 +548,17 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
       throw new Error(`Invalid raised value captured: "${raised}" for memberId ${memberId}`);
     }
 
-    const { value: raisedValue, currency } = parseAmount(`$${raised}`);
+    // Parse amount with subdomain to determine correct currency
+    const { value: raisedValue, currency } = parseAmount(`$${raised}`, subdomain);
     
     // Validate the parsed value is not empty or zero (unless it's actually zero)
     if (!raisedValue || raisedValue === "0" || raisedValue === "") {
       console.warn(`[SCRAPE] Parsed raised value is invalid: "${raisedValue}" from input: "${raised}"`);
     }
     
-    const raisedFormatted = `$${raisedValue}`;
+    // Format amount with appropriate currency symbol
+    const currencySymbol = getCurrencySymbol(currency);
+    const raisedFormatted = `${currencySymbol}${raisedValue}`;
     
     let result = {
       amount: raisedFormatted,
@@ -563,8 +567,9 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
     };
 
     if (target && isValidNumber(target)) {
-      const { value: targetValue } = parseAmount(`$${target}`);
-      const targetFormatted = `$${targetValue}`;
+      const { value: targetValue, currency: targetCurrency } = parseAmount(`$${target}`, subdomain);
+      // Use the same currency symbol for consistency
+      const targetFormatted = `${currencySymbol}${targetValue}`;
       result.target = targetFormatted;
       result.percentage = calculatePercentage(raisedValue, targetValue);
     } else if (target) {

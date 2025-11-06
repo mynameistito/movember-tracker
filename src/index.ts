@@ -269,8 +269,14 @@ export default {
     }
     .progress-container {
       display: flex;
-      align-items: center;
-      gap: 20px;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+    }
+    .amounts-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
       width: 100%;
     }
     .amount-label {
@@ -278,15 +284,29 @@ export default {
       font-weight: 700;
       letter-spacing: -0.02em;
       white-space: nowrap;
-      min-width: 200px;
-      text-align: right;
       transition: opacity 0.3s ease;
     }
     .amount-label.updating {
       opacity: 0.7;
     }
+    .target-label {
+      font-size: 24px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      color: #aaa;
+      transition: opacity 0.3s ease;
+    }
+    .target-label.updating {
+      opacity: 0.7;
+    }
+    .target-label .target-prefix {
+      font-size: 20px;
+      font-weight: 400;
+      margin-right: 8px;
+    }
     .progress-bar-wrapper {
-      flex: 1;
+      width: 100%;
       height: 60px;
       background: #1a1a1a;
       border-radius: 30px;
@@ -301,27 +321,20 @@ export default {
       border-radius: 30px;
       transition: width 0.5s ease;
     }
-    .target-label {
-      font-size: 48px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      white-space: nowrap;
-      min-width: 200px;
-      text-align: left;
-      transition: opacity 0.3s ease;
-    }
-    .target-label.updating {
-      opacity: 0.7;
-    }
     @media (max-width: 768px) {
-      .progress-container {
+      .amounts-row {
         flex-direction: column;
-        gap: 15px;
+        gap: 10px;
+        align-items: flex-start;
       }
-      .amount-label, .target-label {
+      .amount-label {
         font-size: 36px;
-        min-width: auto;
-        text-align: center;
+      }
+      .target-label {
+        font-size: 20px;
+      }
+      .target-label .target-prefix {
+        font-size: 18px;
       }
       .progress-bar-wrapper {
         width: 100%;
@@ -332,11 +345,13 @@ export default {
 <body>
   <div class="container">
     <div class="progress-container">
-      <div class="amount-label" id="amount">${amount}</div>
+      <div class="amounts-row">
+        <div class="amount-label" id="amount">${amount}</div>
+        <div class="target-label" id="target"><span class="target-prefix">Target:</span>${target}</div>
+      </div>
       <div class="progress-bar-wrapper">
         <div class="progress-bar-fill" id="progressBar"></div>
       </div>
-      <div class="target-label" id="target">${target}</div>
     </div>
   </div>
   <script>
@@ -360,7 +375,7 @@ export default {
           
           setTimeout(() => {
             amountElement.textContent = data.amount || '$0';
-            targetElement.textContent = data.target || '$0';
+            targetElement.innerHTML = '<span class="target-prefix">Target:</span>' + (data.target || '$0');
             const percentage = data.percentage || 0;
             progressBar.style.width = Math.min(percentage, 100) + '%';
             currentData = {

@@ -347,7 +347,7 @@
     <section>
       <h2>How It Works</h2>
       <ul>
-        <li>The client-side JavaScript fetches Movember page HTML using allOrigins CORS proxy</li>
+        <li>The client-side JavaScript fetches Movember page HTML using the Worker's CORS proxy</li>
         <li>Parses the HTML using regex patterns to extract donation amounts</li>
         <li>Results are cached in localStorage for 5 minutes to avoid excessive requests</li>
         <li>Automatically detects the correct Movember subdomain</li>

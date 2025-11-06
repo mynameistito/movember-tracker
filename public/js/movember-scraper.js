@@ -84,12 +84,12 @@ async function detectSubdomainForMember(memberId, forceRefresh = false) {
   const testUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", DEFAULT_SUBDOMAIN) + `?memberId=${memberId}`;
   
   try {
-    // Use allOrigins proxy to fetch and check redirects
-    // Note: allOrigins follows redirects, so we need to check the final URL
+    // Use Worker's CORS proxy to fetch and check redirects
+    // Note: The proxy follows redirects, so we need to check the final URL
     const html = await fetchViaProxy(testUrl);
     
     // Try to extract subdomain from the HTML or check common subdomains
-    // Since we can't easily get redirect URL from allOrigins, try common subdomains
+    // Since we can't easily get redirect URL from the proxy, try common subdomains
     const commonSubdomains = ['au', 'us', 'uk', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it'];
     
     // Check if the HTML contains valid donation data (indicates correct subdomain)
@@ -144,7 +144,7 @@ async function buildMovemberUrl(memberId) {
   return `${baseUrl}?memberId=${memberId}`;
 }
 
-// Scrape the Movember page using allOrigins proxy and HTML parsing
+// Scrape the Movember page using Worker's CORS proxy and HTML parsing
 export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) {
   const movemberUrl = await buildMovemberUrl(memberId);
   let subdomain = await getSubdomainForMember(memberId);
@@ -152,7 +152,7 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
   console.log(`[SCRAPE] Starting scrape of Movember page: ${movemberUrl} (subdomain: ${subdomain})`);
   
   try {
-    // Fetch the HTML via allOrigins proxy
+    // Fetch the HTML via Worker's CORS proxy
     console.log(`[SCRAPE] Fetching HTML from ${movemberUrl} via proxy...`);
     const fetchStart = Date.now();
     let html;

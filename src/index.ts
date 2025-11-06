@@ -1,7 +1,4 @@
-import puppeteer from "@cloudflare/puppeteer";
-
 interface Env {
-  MYBROWSER: Fetcher;
   CACHE: KVNamespace;
 }
 
@@ -13,7 +10,8 @@ interface ScrapedData {
   timestamp: number;
 }
 
-const MOVEMBER_URL = "https://au.movember.com/donate/details?memberId=14810348";
+const MOVEMBER_BASE_URL = "https://au.movember.com/donate/details";
+const DEFAULT_MEMBER_ID = "14810348"; // Default member ID if none provided
 const CACHE_TTL = 300; // 5 minutes in seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff in milliseconds
@@ -52,82 +50,117 @@ const formatDuration = (ms: number): string => {
   return `${seconds}s (${ms}ms)`;
 };
 
-// Scrape the Movember page
-async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
+// Scrape the Movember page using fetch and HTML parsing
+async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedData> {
+  const movemberUrl = `${MOVEMBER_BASE_URL}?memberId=${memberId}`;
   const startTime = Date.now();
-  console.log(`[SCRAPE] Starting scrape of Movember page: ${MOVEMBER_URL}`);
-  
-  const browserLaunchStart = Date.now();
-  const browser = await puppeteer.launch(env.MYBROWSER);
-  const browserLaunchDuration = Date.now() - browserLaunchStart;
-  console.log(`[BROWSER] Browser launched successfully in ${formatDuration(browserLaunchDuration)}`);
-  let page;
+  console.log(`[SCRAPE] Starting scrape of Movember page: ${movemberUrl}`);
   
   try {
-    const pageCreateStart = Date.now();
-    page = await browser.newPage();
-    const pageCreateDuration = Date.now() - pageCreateStart;
-    console.log(`[BROWSER] New page created in ${formatDuration(pageCreateDuration)}`);
+    // Fetch the HTML directly
+    console.log(`[SCRAPE] Fetching HTML from ${movemberUrl}...`);
+    const fetchStart = Date.now();
+    const response = await fetch(movemberUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
     
-    // Set a reasonable timeout
-    console.log(`[SCRAPE] Navigating to ${MOVEMBER_URL}...`);
-    const navigationStart = Date.now();
-    await page.goto(MOVEMBER_URL, {
-      waitUntil: "networkidle2",
-      timeout: 30000,
-    });
-    const navigationDuration = Date.now() - navigationStart;
-    console.log(`[BROWSER] Page navigation completed in ${formatDuration(navigationDuration)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const html = await response.text();
+    const fetchDuration = Date.now() - fetchStart;
+    console.log(`[SCRAPE] HTML fetched successfully in ${formatDuration(fetchDuration)} (${html.length} characters)`);
 
-    // Wait for the content to load - look for text containing "Raised"
-    console.log(`[SCRAPE] Waiting for "Raised" text to appear...`);
-    const waitStart = Date.now();
-    await page.waitForFunction(
-      () => document.body.innerText.includes("Raised"),
-      { timeout: 10000 }
-    );
-    const waitDuration = Date.now() - waitStart;
-    console.log(`[BROWSER] "Raised" text found in ${formatDuration(waitDuration)}`);
-
-    // Extract the data using page.evaluate
-    console.log(`[SCRAPE] Extracting data from page...`);
-    const evaluateStart = Date.now();
-    const data = await page.evaluate(() => {
-      let raised = "";
-      let target = "";
-      
-      // Target the specific CSS class for raised amount
-      const raisedElement = document.querySelector(".donationProgress--amount__raised");
-      if (raisedElement) {
-        const raisedText = raisedElement.textContent || "";
-        const raisedMatch = raisedText.match(/\$([\d,]+)/);
-        if (raisedMatch) {
-          raised = raisedMatch[1];
+    // Extract data from HTML using regex
+    console.log(`[SCRAPE] Extracting data from HTML...`);
+    const extractStart = Date.now();
+    
+    let raised = "";
+    let target = "";
+    
+    // Look for the raised amount in the HTML
+    // Try multiple patterns to find the data
+    const raisedPatterns = [
+      // Pattern 1: Look for the CSS class with amount
+      /donationProgress--amount__raised[^>]*>([^<]*\$([\d,]+)[^<]*)/i,
+      // Pattern 2: Look for the class followed by text content
+      /class="[^"]*donationProgress--amount__raised[^"]*"[^>]*>[\s\S]*?\$([\d,]+)/i,
+      // Pattern 3: Look for data attributes or JSON
+      /"raised"[:\s]*\$?([\d,]+)/i,
+    ];
+    
+    for (const pattern of raisedPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        raised = match[match.length - 1]; // Get the last capture group (the amount)
+        console.log(`[SCRAPE] Found raised amount using pattern: ${raised}`);
+        break;
+      }
+    }
+    
+    // Look for the target amount in the HTML
+    const targetPatterns = [
+      // Pattern 1: Look for the CSS class with amount
+      /donationProgress--amount__target[^>]*>([^<]*\$([\d,]+)[^<]*)/i,
+      // Pattern 2: Look for the class followed by text content
+      /class="[^"]*donationProgress--amount__target[^"]*"[^>]*>[\s\S]*?\$([\d,]+)/i,
+      // Pattern 3: Look for data attributes or JSON
+      /"target"[:\s]*\$?([\d,]+)/i,
+    ];
+    
+    for (const pattern of targetPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        target = match[match.length - 1]; // Get the last capture group (the amount)
+        console.log(`[SCRAPE] Found target amount using pattern: ${target}`);
+        break;
+      }
+    }
+    
+    // Fallback: Look for JSON data in script tags
+    if (!raised || !target) {
+      console.log(`[SCRAPE] Checking for JSON data in script tags...`);
+      const scriptTagMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+      if (scriptTagMatches) {
+        for (const scriptTag of scriptTagMatches) {
+          // Look for JSON data containing donation amounts
+          const jsonPatterns = [
+            /"raised"[:\s]*\$?([\d,]+)/i,
+            /"target"[:\s]*\$?([\d,]+)/i,
+            /"amount"[:\s]*\$?([\d,]+)/i,
+            /"donationAmount"[:\s]*\$?([\d,]+)/i,
+            /"goal"[:\s]*\$?([\d,]+)/i,
+          ];
+          
+          for (const pattern of jsonPatterns) {
+            const match = scriptTag.match(pattern);
+            if (match && !raised) {
+              raised = match[1];
+              console.log(`[SCRAPE] Found raised amount in JSON: ${raised}`);
+            }
+            if (match && !target) {
+              target = match[1];
+              console.log(`[SCRAPE] Found target amount in JSON: ${target}`);
+            }
+          }
         }
       }
-      
-      // Target the specific CSS class for target amount
-      const targetElement = document.querySelector(".donationProgress--amount__target");
-      if (targetElement) {
-        const targetText = targetElement.textContent || "";
-        const targetMatch = targetText.match(/\$([\d,]+)/);
-        if (targetMatch) {
-          target = targetMatch[1];
-        }
-      }
-      
-      return { raised, target };
-    });
-    const evaluateDuration = Date.now() - evaluateStart;
-    console.log(`[BROWSER] Data extraction completed in ${formatDuration(evaluateDuration)}`);
+    }
+    
+    const extractDuration = Date.now() - extractStart;
+    console.log(`[SCRAPE] Data extraction completed in ${formatDuration(extractDuration)}`);
+    console.log(`[SCRAPE] Raw extracted data:`, { raised: raised || "NOT FOUND", target: target || "NOT FOUND" });
 
-    console.log(`[SCRAPE] Raw extracted data:`, { raised: data.raised || "NOT FOUND", target: data.target || "NOT FOUND" });
-
-    if (!data.raised) {
-      throw new Error("Could not find raised amount on page");
+    if (!raised) {
+      throw new Error("Could not find raised amount in HTML. The page may require JavaScript execution.");
     }
 
-    const { value: raisedValue, currency } = parseAmount(`$${data.raised}`);
+    const { value: raisedValue, currency } = parseAmount(`$${raised}`);
     const raisedFormatted = `$${raisedValue}`;
     
     let result: ScrapedData = {
@@ -136,26 +169,14 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
       timestamp: Date.now(),
     };
 
-    if (data.target) {
-      const { value: targetValue } = parseAmount(`$${data.target}`);
+    if (target) {
+      const { value: targetValue } = parseAmount(`$${target}`);
       const targetFormatted = `$${targetValue}`;
       result.target = targetFormatted;
       result.percentage = calculatePercentage(raisedValue, targetValue);
     }
 
     const totalDuration = Date.now() - startTime;
-    const totalSeconds = Math.round(totalDuration / 1000);
-    const totalMinutes = Math.floor(totalSeconds / 60);
-    const remainingSeconds = totalSeconds % 60;
-    
-    // Warn if approaching 10-minute limit (9 minutes = 540 seconds)
-    if (totalSeconds >= 540) {
-      console.warn(`[BROWSER] ⚠️ WARNING: Browser rendering time is ${totalMinutes}m ${remainingSeconds}s - approaching 10-minute free limit!`);
-    } else if (totalSeconds >= 480) {
-      console.warn(`[BROWSER] ⚠️ CAUTION: Browser rendering time is ${totalMinutes}m ${remainingSeconds}s - getting close to 10-minute limit`);
-    }
-    
-    console.log(`[BROWSER] Total browser rendering time: ${formatDuration(totalDuration)}`);
     console.log(`[SCRAPE] Scraping completed successfully in ${formatDuration(totalDuration)}:`, {
       amount: result.amount,
       target: result.target,
@@ -167,32 +188,22 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
   } catch (error) {
     const totalDuration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[BROWSER] Total browser rendering time before error: ${formatDuration(totalDuration)}`);
     console.error(`[SCRAPE] Scraping failed after ${formatDuration(totalDuration)}:`, errorMessage, error);
     throw error;
-  } finally {
-    try {
-      const closeStart = Date.now();
-      await browser.close();
-      const closeDuration = Date.now() - closeStart;
-      console.log(`[BROWSER] Browser closed in ${formatDuration(closeDuration)}`);
-    } catch (closeError) {
-      console.error(`[SCRAPE] Error closing browser:`, closeError);
-    }
   }
 }
 
 // Retry wrapper with exponential backoff
-async function scrapeWithRetry(env: Env): Promise<ScrapedData> {
+async function scrapeWithRetry(env: Env, memberId: string): Promise<ScrapedData> {
   let lastError: Error | null = null;
   const retryStartTime = Date.now();
 
-  console.log(`[RETRY] Starting retry logic (max ${MAX_RETRIES} attempts)`);
+  console.log(`[RETRY] Starting retry logic (max ${MAX_RETRIES} attempts) for memberId: ${memberId}`);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       console.log(`[RETRY] Attempt ${attempt + 1}/${MAX_RETRIES}`);
-      const result = await scrapeMovemberPage(env);
+      const result = await scrapeMovemberPage(env, memberId);
       const totalDuration = Date.now() - retryStartTime;
       console.log(`[RETRY] Success on attempt ${attempt + 1} after ${totalDuration}ms`);
       return result;
@@ -225,20 +236,23 @@ export default {
     console.log(`[REQUEST] ${method} ${pathname} from ${url.origin}`);
 
     try {
-      // Check for grab-live parameter
+      // Get memberId from query parameters, use default if not provided
+      const memberId = url.searchParams.get("memberId") || url.searchParams.get("memberid") || DEFAULT_MEMBER_ID;
       const grabLive = url.searchParams.has("grab-live");
-      const cacheKey = "movember:amount:14810348";
+      const cacheKey = `movember:amount:${memberId}`;
       let data: ScrapedData | null = null;
       let cacheStatus = "HIT";
 
+      console.log(`[REQUEST] Processing request for memberId: ${memberId}`);
+
       if (grabLive) {
         // Force fresh scrape, bypass cache
-        console.log(`[LIVE] grab-live parameter detected - forcing fresh scrape`);
-        data = await scrapeWithRetry(env);
+        console.log(`[LIVE] grab-live parameter detected - forcing fresh scrape for memberId: ${memberId}`);
+        data = await scrapeWithRetry(env, memberId);
         cacheStatus = "LIVE";
         
         // Store in cache with 5-minute TTL
-        console.log(`[CACHE] Storing live data in cache with TTL: ${CACHE_TTL}s`);
+        console.log(`[CACHE] Storing live data in cache with TTL: ${CACHE_TTL}s for memberId: ${memberId}`);
         await env.CACHE.put(cacheKey, JSON.stringify(data), {
           expirationTtl: CACHE_TTL,
         });
@@ -251,22 +265,22 @@ export default {
 
         if (data) {
           const cacheAge = Date.now() - data.timestamp;
-          console.log(`[CACHE] Cache HIT - data age: ${Math.round(cacheAge / 1000)}s`, {
+          console.log(`[CACHE] Cache HIT - data age: ${Math.round(cacheAge / 1000)}s for memberId: ${memberId}`, {
             amount: data.amount,
             target: data.target,
             timestamp: new Date(data.timestamp).toISOString(),
           });
         } else {
-          console.log(`[CACHE] Cache MISS - need to scrape`);
+          console.log(`[CACHE] Cache MISS - need to scrape for memberId: ${memberId}`);
         }
 
         // If cache miss, scrape the page
         if (!data) {
-          data = await scrapeWithRetry(env);
+          data = await scrapeWithRetry(env, memberId);
           cacheStatus = "MISS";
           
           // Store in cache with 5-minute TTL
-          console.log(`[CACHE] Storing data in cache with TTL: ${CACHE_TTL}s`);
+          console.log(`[CACHE] Storing data in cache with TTL: ${CACHE_TTL}s for memberId: ${memberId}`);
           await env.CACHE.put(cacheKey, JSON.stringify(data), {
             expirationTtl: CACHE_TTL,
           });
@@ -293,6 +307,7 @@ export default {
         const percentage = data.percentage || 0;
         const amount = data.amount || "$0";
         const target = data.target || "$0";
+        const currentMemberId = memberId; // Store memberId for use in template
         
         const html = `<!DOCTYPE html>
 <html lang="en">
@@ -420,9 +435,14 @@ export default {
       percentage: ${percentage}
     };
     
+    // Get memberId from URL query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || '${currentMemberId}';
+    
     async function updateData() {
       try {
-        const response = await fetch('/json');
+        const jsonUrl = '/json' + (memberId ? '?memberId=' + encodeURIComponent(memberId) : '');
+        const response = await fetch(jsonUrl);
         const data = await response.json();
         
         if (data.amount && (data.amount !== currentData.amount || data.target !== currentData.target)) {

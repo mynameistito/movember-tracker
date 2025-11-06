@@ -1,6 +1,6 @@
 # Movember Donation Scraper
 
-A Cloudflare Worker that automatically tracks your Movember donation progress. This tool scrapes your Movember donation page and provides the data in a format perfect for stream overlays or websites.
+A Cloudflare Worker that automatically tracks your Movember donation progress. This tool fetches and parses your Movember donation page HTML to extract donation data, providing it in a format perfect for stream overlays or websites.
 
 ## What This Does
 
@@ -59,24 +59,27 @@ Add the following bindings to your `wrangler.jsonc` file:
 
 Replace `your-kv-namespace-id` with the ID from your KV namespace (found in the Cloudflare Dashboard).
 
-### Step 6: Update Your Movember URL
-
-1. In your forked repository on GitHub, go to `src/index.ts`
-2. Click the pencil icon to edit the file
-3. Find the line:
-   ```typescript
-   const MOVEMBER_URL = "https://au.movember.com/donate/details?memberId=14810348";
-   ```
-4. Replace the URL with your Movember page URL
-5. Click **"Commit changes"**
-6. Cloudflare will automatically redeploy your Worker!
-
-
 ## Using Your Worker
 
 Once deployed, your Worker will be available at:
 - **Main page:** `https://your-worker-name.your-subdomain.workers.dev`
 - **JSON data:** `https://your-worker-name.your-subdomain.workers.dev/json`
+
+### Using the memberId Parameter
+
+You can track any Movember member by adding the `memberId` query parameter to your URLs:
+
+**Examples:**
+- Default member (14810348): `https://your-worker-name.your-subdomain.workers.dev`
+- Specific member: `https://your-worker-name.your-subdomain.workers.dev?memberId=12345678`
+- JSON for specific member: `https://your-worker-name.your-subdomain.workers.dev/json?memberId=12345678`
+
+**To find your Movember member ID:**
+1. Go to your Movember donation page (e.g., `https://au.movember.com/donate/details?memberId=YOUR_ID`)
+2. The number after `memberId=` in the URL is your member ID
+3. Use that ID in the query parameter when accessing the Worker
+
+Each member ID has its own cache, so different members' data won't interfere with each other.
 
 ### JSON Response Format
 
@@ -92,23 +95,26 @@ Once deployed, your Worker will be available at:
 
 ## How It Works
 
-- The Worker checks your Movember page every time someone requests the data
+- The Worker fetches your Movember page HTML directly using `fetch()`
+- Parses the HTML using regex patterns to extract donation amounts from CSS classes
 - Results are cached for 5 minutes to avoid excessive requests
-- Uses Cloudflare's Browser Rendering API to scrape the page
+- Much faster and more cost-effective than browser rendering
 
 ## Troubleshooting
 
 **Worker shows errors:**
 - Check the **"Logs"** tab in your Worker dashboard
 - Make sure your KV namespace binding is named `CACHE`
-- Make sure your Browser Rendering binding is named `MYBROWSER`
+- If you see "Could not find raised amount in HTML", the page structure may have changed or requires JavaScript execution
 
 **Wrong donation amount:**
 - The Worker caches data for 5 minutes - wait a bit and try again
-- Double-check that your Movember URL is correct in `src/index.ts`
+- Double-check that the `memberId` parameter matches your Movember member ID
+- You can force a fresh scrape by adding `&grab-live=true` to the URL
 
-**Need to update the Movember URL:**
+**Need to change the default member ID:**
 - Edit `src/index.ts` in your GitHub repository
+- Find `const DEFAULT_MEMBER_ID = "14810348";` and change the ID
 - Cloudflare will automatically redeploy when you commit changes
 
 ## License

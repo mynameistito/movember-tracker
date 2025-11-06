@@ -26,6 +26,7 @@ function extractSubdomainFromUrl(url) {
 }
 
 // Helper function to fetch HTML using Worker's CORS proxy
+// Returns both HTML and the final URL after redirects
 async function fetchViaProxy(url) {
   const proxyUrl = `${getProxyUrl()}?url=${encodeURIComponent(url)}`;
   const response = await fetch(proxyUrl);
@@ -55,20 +56,42 @@ async function fetchViaProxy(url) {
   
   // Worker proxy returns HTML directly
   const html = await response.text();
-  return html;
+  // Get final URL after redirects from response header
+  const finalUrl = response.headers.get("X-Final-URL") || url;
+  
+  return { html, finalUrl };
 }
 
 // Helper function to detect subdomain from HTML content by checking currency symbols
-// This is used only for verification - the URL subdomain is the primary source of truth
-// Made more conservative: requires currency codes or symbols near amounts, not just anywhere
+// This is used for verification - if currency doesn't match URL subdomain, we skip it
+// Made more aggressive: checks for currency symbols anywhere, not just near amounts
 function detectSubdomainFromHtml(html) {
   if (!html) return null;
   
-  // Look for currency codes near amounts (more reliable than just symbols anywhere)
+  // First, check for unambiguous currency symbols anywhere in HTML (most reliable)
+  // £ symbol anywhere indicates UK (GBP)
+  if (html.includes('£') || html.includes('&pound;') || html.includes('&#163;')) {
+    return 'uk';
+  }
+  
+  // € symbol anywhere indicates EU
+  if (html.includes('€') || html.includes('&euro;') || html.includes('&#8364;')) {
+    // Try to determine which EU country by checking for country-specific text
+    if (html.match(/Ireland|Irish/i)) return 'ie';
+    if (html.match(/Netherlands|Dutch/i)) return 'nl';
+    if (html.match(/Germany|German/i)) return 'de';
+    if (html.match(/France|French/i)) return 'fr';
+    if (html.match(/Spain|Spanish/i)) return 'es';
+    if (html.match(/Italy|Italian/i)) return 'it';
+    // Default to first EU country if we can't determine
+    return 'ie';
+  }
+  
+  // Look for currency codes near amounts (secondary check)
   // Pattern: currency code followed by amount, or amount followed by currency code
   const currencyCodePatterns = [
-    /\bGBP\b[\s:]*[\d,]+|[\d,]+[\s:]*\bGBP\b|£[\d,]+|British\s+Pound/i,
-    /\bEUR\b[\s:]*[\d,]+|[\d,]+[\s:]*\bEUR\b|€[\d,]+|Euro[\s:]*[\d,]+/i,
+    /\bGBP\b[\s:]*[\d,]+|[\d,]+[\s:]*\bGBP\b|British\s+Pound/i,
+    /\bEUR\b[\s:]*[\d,]+|[\d,]+[\s:]*\bEUR\b|Euro[\s:]*[\d,]+/i,
     /\bUSD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bUSD\b|US\s+Dollar/i,
     /\bAUD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bAUD\b|Australian\s+Dollar/i,
     /\bCAD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bCAD\b|Canadian\s+Dollar/i,
@@ -79,7 +102,7 @@ function detectSubdomainFromHtml(html) {
     /\bDKK\b[\s:]*[\d,]+|[\d,]+[\s:]*\bDKK\b|Danish\s+Krone/i,
   ];
   
-  // Check for GBP/£ near amounts (UK)
+  // Check for GBP code near amounts (UK) - secondary check after symbol check
   if (currencyCodePatterns[0].test(html)) {
     return 'uk';
   }
@@ -181,33 +204,50 @@ async function detectSubdomainForMember(memberId, forceRefresh = false) {
   
   try {
     // Try common subdomains and check for currency indicators
-    // Primary method: Use the URL subdomain we're testing (most reliable)
-    // Secondary method: Verify with HTML currency check
+    // Primary method: Verify with HTML currency check (most reliable)
+    // Secondary method: Use URL subdomain as fallback if currency check is inconclusive
+    let fallbackSubdomain = null;
+    
     for (const subdomain of commonSubdomains) {
       const testSubdomainUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain) + `?memberId=${memberId}`;
       try {
-        const testHtml = await fetchViaProxy(testSubdomainUrl);
+        const { html: testHtml, finalUrl } = await fetchViaProxy(testSubdomainUrl);
+        
+        // Extract actual subdomain from final URL (after redirects)
+        const actualSubdomain = extractSubdomainFromUrl(finalUrl);
+        
         if (testHtml && testHtml.length > 1000) {
-          // Primary: Trust the URL subdomain we're testing
-          // Secondary: Use HTML currency check only as verification (more conservative)
+          // Check HTML for currency indicators
           const detectedSubdomain = detectSubdomainFromHtml(testHtml);
           
-          // If HTML currency check confirms the subdomain, use it immediately
-          if (detectedSubdomain === subdomain) {
+          // Priority 1: Use actual subdomain from final URL (after redirects) - most reliable
+          if (actualSubdomain && actualSubdomain !== subdomain) {
+            // URL redirected to a different subdomain - use the actual one
+            console.log(`[SUBDOMAIN] URL redirected from ${subdomain} to ${actualSubdomain} for memberId ${memberId}`);
+            setCachedSubdomain(memberId, actualSubdomain, SUBDOMAIN_CACHE_TTL);
+            return actualSubdomain;
+          }
+          
+          // Priority 2: If HTML currency check confirms the subdomain, use it
+          if (detectedSubdomain === subdomain || detectedSubdomain === actualSubdomain) {
             // HTML matches this subdomain's currency - this is correct
-            console.log(`[SUBDOMAIN] Found matching subdomain for memberId ${memberId}: ${subdomain} (verified by currency)`);
-            setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
-            return subdomain;
-          } else if (detectedSubdomain && detectedSubdomain !== subdomain) {
-            // HTML indicates a different subdomain - skip this one (likely wrong URL)
-            console.log(`[SUBDOMAIN] HTML currency indicates ${detectedSubdomain} but we tested ${subdomain}, skipping...`);
-            continue;
+            const confirmedSubdomain = actualSubdomain || subdomain;
+            console.log(`[SUBDOMAIN] Found matching subdomain for memberId ${memberId}: ${confirmedSubdomain} (verified by currency)`);
+            setCachedSubdomain(memberId, confirmedSubdomain, SUBDOMAIN_CACHE_TTL);
+            return confirmedSubdomain;
+          } else if (detectedSubdomain && detectedSubdomain !== subdomain && detectedSubdomain !== actualSubdomain) {
+            // HTML indicates a different subdomain - use the detected one (currency is reliable)
+            console.log(`[SUBDOMAIN] HTML currency indicates ${detectedSubdomain} (tested ${subdomain}, final URL: ${actualSubdomain || subdomain}), using detected subdomain`);
+            setCachedSubdomain(memberId, detectedSubdomain, SUBDOMAIN_CACHE_TTL);
+            return detectedSubdomain;
           } else {
-            // Can't determine from currency, but HTML is valid - trust the URL subdomain
-            // This is the primary method: if the URL works, use that subdomain
-            console.log(`[SUBDOMAIN] Found valid HTML for subdomain ${subdomain} (currency check inconclusive, trusting URL)`);
-            setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
-            return subdomain;
+            // Can't determine from currency, but HTML is valid
+            // Use actual subdomain from final URL, or tested subdomain as fallback
+            const fallbackSubdomainToUse = actualSubdomain || subdomain;
+            if (!fallbackSubdomain) {
+              fallbackSubdomain = fallbackSubdomainToUse;
+              console.log(`[SUBDOMAIN] Found valid HTML for subdomain ${fallbackSubdomainToUse} (currency check inconclusive, storing as fallback)`);
+            }
           }
         }
       } catch (e) {
@@ -216,14 +256,23 @@ async function detectSubdomainForMember(memberId, forceRefresh = false) {
       }
     }
     
+    // If we found a fallback subdomain (valid HTML but inconclusive currency), use it
+    if (fallbackSubdomain) {
+      console.log(`[SUBDOMAIN] Using fallback subdomain for memberId ${memberId}: ${fallbackSubdomain} (no currency match found)`);
+      setCachedSubdomain(memberId, fallbackSubdomain, SUBDOMAIN_CACHE_TTL);
+      return fallbackSubdomain;
+    }
+    
     // If we couldn't determine by currency, try default subdomain
     const testUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", DEFAULT_SUBDOMAIN) + `?memberId=${memberId}`;
     try {
-      const html = await fetchViaProxy(testUrl);
+      const { html, finalUrl } = await fetchViaProxy(testUrl);
       if (html && html.length > 1000) {
-        console.log(`[SUBDOMAIN] Using default subdomain for memberId ${memberId}: ${DEFAULT_SUBDOMAIN}`);
-        setCachedSubdomain(memberId, DEFAULT_SUBDOMAIN, SUBDOMAIN_CACHE_TTL);
-        return DEFAULT_SUBDOMAIN;
+        // Extract actual subdomain from final URL (after redirects)
+        const actualSubdomain = extractSubdomainFromUrl(finalUrl) || DEFAULT_SUBDOMAIN;
+        console.log(`[SUBDOMAIN] Using default subdomain for memberId ${memberId}: ${actualSubdomain}`);
+        setCachedSubdomain(memberId, actualSubdomain, SUBDOMAIN_CACHE_TTL);
+        return actualSubdomain;
       }
     } catch (e) {
       // Continue to fallback
@@ -270,9 +319,12 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
     console.log(`[SCRAPE] Fetching HTML from ${movemberUrl} via proxy...`);
     const fetchStart = Date.now();
     let html;
+    let finalUrl;
     
     try {
-      html = await fetchViaProxy(movemberUrl);
+      const result = await fetchViaProxy(movemberUrl);
+      html = result.html;
+      finalUrl = result.finalUrl;
     } catch (error) {
       // If we get an error, try clearing subdomain cache and re-detecting
       if (clearSubdomainOn404 && error.message.includes('404')) {
@@ -284,7 +336,9 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
           console.log(`[SCRAPE] Re-detected subdomain: ${newSubdomain} (was ${subdomain}), retrying with new subdomain...`);
           // Retry with new subdomain
           const newUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", newSubdomain) + `?memberId=${memberId}`;
-          html = await fetchViaProxy(newUrl);
+          const retryResult = await fetchViaProxy(newUrl);
+          html = retryResult.html;
+          finalUrl = retryResult.finalUrl;
           subdomain = newSubdomain;
         } else {
           throw new Error(`HTTP error! status: 404 (page not found - member may not exist)`);
@@ -297,8 +351,16 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
     const fetchDuration = Date.now() - fetchStart;
     console.log(`[SCRAPE] HTML fetched successfully in ${formatDuration(fetchDuration)} (${html.length} characters)`);
 
+    // Check if URL redirected to a different subdomain
+    const actualSubdomain = extractSubdomainFromUrl(finalUrl);
+    if (actualSubdomain && actualSubdomain !== subdomain) {
+      console.log(`[SCRAPE] URL redirected from ${subdomain} to ${actualSubdomain}, updating subdomain...`);
+      subdomain = actualSubdomain;
+      // Update cache with correct subdomain
+      setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
+    }
+
     // Verify subdomain by checking HTML content for currency indicators (optional verification only)
-    // The URL subdomain is the primary source of truth - HTML check is just for validation
     const htmlDetectedSubdomain = detectSubdomainFromHtml(html);
     if (htmlDetectedSubdomain && htmlDetectedSubdomain !== subdomain) {
       console.warn(`[SCRAPE] HTML currency indicates subdomain ${htmlDetectedSubdomain} but URL subdomain is ${subdomain}. Trusting URL subdomain (primary source).`);

@@ -33,6 +33,7 @@ export default {
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
               'Accept-Language': 'en-US,en;q=0.9',
             },
+            redirect: 'follow', // Explicitly follow redirects
           });
 
           if (!response.ok) {
@@ -40,6 +41,8 @@ export default {
           }
 
           const html = await response.text();
+          // Get the final URL after redirects
+          const finalUrl = response.url;
           
           return new Response(html, {
             status: 200,
@@ -48,6 +51,7 @@ export default {
               "Access-Control-Allow-Origin": "*",
               "Access-Control-Allow-Methods": "GET, OPTIONS",
               "Access-Control-Allow-Headers": "Content-Type",
+              "X-Final-URL": finalUrl, // Include final URL in response header
             },
           });
         } catch (error) {

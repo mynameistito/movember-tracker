@@ -58,6 +58,44 @@ async function fetchViaProxy(url) {
   return html;
 }
 
+// Helper function to detect subdomain from HTML content by checking currency symbols
+function detectSubdomainFromHtml(html) {
+  if (!html) return null;
+  
+  // Check for currency symbols in HTML to determine subdomain
+  // £ indicates UK (GBP)
+  if (html.includes('£') || html.includes('&pound;') || html.match(/GBP|British Pound/i)) {
+    return 'uk';
+  }
+  // € indicates EU countries
+  if (html.includes('€') || html.includes('&euro;') || html.match(/EUR|Euro/i)) {
+    // Try to determine which EU country by checking for country-specific text
+    if (html.match(/Ireland|Irish/i)) return 'ie';
+    if (html.match(/Netherlands|Dutch/i)) return 'nl';
+    if (html.match(/Germany|German/i)) return 'de';
+    if (html.match(/France|French/i)) return 'fr';
+    if (html.match(/Spain|Spanish/i)) return 'es';
+    if (html.match(/Italy|Italian/i)) return 'it';
+    // Default to first EU country if we can't determine
+    return 'ie';
+  }
+  // $ could be USD, AUD, CAD, or NZD - need to check further
+  if (html.includes('$') || html.includes('&dollar;')) {
+    if (html.match(/USD|US Dollar|United States/i)) return 'us';
+    if (html.match(/CAD|Canadian Dollar|Canada/i)) return 'ca';
+    if (html.match(/NZD|New Zealand Dollar|New Zealand/i)) return 'nz';
+    if (html.match(/AUD|Australian Dollar|Australia/i)) return 'au';
+    // Default to AUD if we can't determine
+    return 'au';
+  }
+  // R for South African Rand
+  if (html.match(/ZAR|South African Rand|South Africa/i)) {
+    return 'za';
+  }
+  
+  return null;
+}
+
 // Helper function to detect subdomain by following redirects
 async function detectSubdomainForMember(memberId, forceRefresh = false) {
   // Check cache first (unless forcing refresh)
@@ -80,40 +118,50 @@ async function detectSubdomainForMember(memberId, forceRefresh = false) {
     return subdomain;
   }
   
-  // Try to detect by following redirects
+  // Try to detect by checking common subdomains and their HTML content
   console.log(`[SUBDOMAIN] Detecting subdomain for memberId ${memberId}...`);
-  const testUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", DEFAULT_SUBDOMAIN) + `?memberId=${memberId}`;
+  const commonSubdomains = ['uk', 'au', 'us', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it'];
   
   try {
-    // Use Worker's CORS proxy to fetch and check redirects
-    // Note: The proxy follows redirects, so we need to check the final URL
-    const html = await fetchViaProxy(testUrl);
-    
-    // Try to extract subdomain from the HTML or check common subdomains
-    // Since we can't easily get redirect URL from the proxy, try common subdomains
-    const commonSubdomains = ['au', 'us', 'uk', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it'];
-    
-    // Check if the HTML contains valid donation data (indicates correct subdomain)
-    if (html && html.length > 1000) {
-      // Likely valid page, use default
-      console.log(`[SUBDOMAIN] Default subdomain appears valid for memberId ${memberId}`);
-      setCachedSubdomain(memberId, DEFAULT_SUBDOMAIN, SUBDOMAIN_CACHE_TTL);
-      return DEFAULT_SUBDOMAIN;
-    }
-    
-    // Try common subdomains
+    // Try common subdomains and check for currency indicators
     for (const subdomain of commonSubdomains) {
       const testSubdomainUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain) + `?memberId=${memberId}`;
       try {
         const testHtml = await fetchViaProxy(testSubdomainUrl);
         if (testHtml && testHtml.length > 1000) {
-          console.log(`[SUBDOMAIN] Found working subdomain for memberId ${memberId}: ${subdomain}`);
-          setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
-          return subdomain;
+          // Check if the HTML matches the expected currency for this subdomain
+          const detectedSubdomain = detectSubdomainFromHtml(testHtml);
+          if (detectedSubdomain === subdomain) {
+            // HTML matches this subdomain's currency - this is likely correct
+            console.log(`[SUBDOMAIN] Found matching subdomain for memberId ${memberId}: ${subdomain} (verified by currency)`);
+            setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
+            return subdomain;
+          } else if (detectedSubdomain && detectedSubdomain !== subdomain) {
+            // HTML indicates a different subdomain - skip this one
+            continue;
+          } else {
+            // Can't determine from currency, but HTML is valid - might be correct
+            // Check if this is the first valid one we found
+            console.log(`[SUBDOMAIN] Found valid HTML for subdomain ${subdomain} (currency check inconclusive)`);
+          }
         }
       } catch (e) {
         // Continue to next subdomain
+        continue;
       }
+    }
+    
+    // If we couldn't determine by currency, try default subdomain
+    const testUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", DEFAULT_SUBDOMAIN) + `?memberId=${memberId}`;
+    try {
+      const html = await fetchViaProxy(testUrl);
+      if (html && html.length > 1000) {
+        console.log(`[SUBDOMAIN] Using default subdomain for memberId ${memberId}: ${DEFAULT_SUBDOMAIN}`);
+        setCachedSubdomain(memberId, DEFAULT_SUBDOMAIN, SUBDOMAIN_CACHE_TTL);
+        return DEFAULT_SUBDOMAIN;
+      }
+    } catch (e) {
+      // Continue to fallback
     }
     
     // Fallback to default
@@ -183,6 +231,15 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
     
     const fetchDuration = Date.now() - fetchStart;
     console.log(`[SCRAPE] HTML fetched successfully in ${formatDuration(fetchDuration)} (${html.length} characters)`);
+
+    // Verify subdomain by checking HTML content for currency indicators
+    const htmlDetectedSubdomain = detectSubdomainFromHtml(html);
+    if (htmlDetectedSubdomain && htmlDetectedSubdomain !== subdomain) {
+      console.log(`[SCRAPE] HTML indicates subdomain ${htmlDetectedSubdomain} but we're using ${subdomain}. Updating subdomain...`);
+      subdomain = htmlDetectedSubdomain;
+      // Update cache with correct subdomain
+      setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
+    }
 
     // Extract data from HTML using regex
     console.log(`[SCRAPE] Extracting data from HTML...`);

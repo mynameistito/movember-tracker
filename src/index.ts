@@ -277,7 +277,7 @@ export default {
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      background: #000;
+      background: transparent;
       color: #fff;
       padding: 20px;
     }
@@ -496,7 +496,7 @@ export default {
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      background: #000;
+      background: transparent;
       color: #fff;
     }
     .error {

@@ -283,6 +283,7 @@
       </div>
       <button class="button" id="fetchButton" onclick="fetchData()">Fetch Data</button>
       <button class="button" id="refreshButton" onclick="fetchData(true)" style="margin-left: 12px;">Force Refresh</button>
+      <button class="button" id="copyOverlayButton" onclick="copyOverlayUrl()" style="margin-left: 12px;">Copy Overlay URL</button>
       <div id="dataDisplay"></div>
     </section>
 
@@ -373,12 +374,57 @@
       return memberId;
     }
 
+    // Copy overlay URL to clipboard
+    window.copyOverlayUrl = async function() {
+      const memberId = getMemberId();
+      const overlayUrl = `${baseUrl}/overlay?memberId=${memberId}`;
+      const copyButton = document.getElementById('copyOverlayButton');
+      const originalText = copyButton.textContent;
+
+      try {
+        await navigator.clipboard.writeText(overlayUrl);
+        // Visual feedback: change button text temporarily
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => {
+          copyButton.textContent = originalText;
+        }, 2000);
+      } catch (error) {
+        // Fallback for older browsers or if clipboard API fails
+        try {
+          // Create a temporary textarea element
+          const textarea = document.createElement('textarea');
+          textarea.value = overlayUrl;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          
+          // Visual feedback
+          copyButton.textContent = 'Copied!';
+          setTimeout(() => {
+            copyButton.textContent = originalText;
+          }, 2000);
+        } catch (fallbackError) {
+          // Show error message
+          const displayDiv = document.getElementById('dataDisplay');
+          displayDiv.innerHTML = `
+            <div class="error">
+              <strong>Error:</strong> Failed to copy URL to clipboard. URL: ${overlayUrl}
+            </div>
+          `;
+        }
+      }
+    };
+
     // Fetch and display data
     window.fetchData = async function(forceRefresh = false) {
       const memberId = getMemberId();
       const displayDiv = document.getElementById('dataDisplay');
       const fetchButton = document.getElementById('fetchButton');
       const refreshButton = document.getElementById('refreshButton');
+      const copyOverlayButton = document.getElementById('copyOverlayButton');
 
       // Update input field
       document.getElementById('memberId').value = memberId;
@@ -386,6 +432,7 @@
       // Disable buttons
       fetchButton.disabled = true;
       refreshButton.disabled = true;
+      copyOverlayButton.disabled = true;
       displayDiv.innerHTML = '<div class="loading">Loading...</div>';
 
       try {
@@ -429,6 +476,7 @@
       } finally {
         fetchButton.disabled = false;
         refreshButton.disabled = false;
+        copyOverlayButton.disabled = false;
       }
     };
 

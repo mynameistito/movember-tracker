@@ -1,4 +1,4 @@
-# Movember Donation Scraper
+# Movember Donation Scraper (Very WIP)
 
 A Cloudflare Worker that automatically tracks your Movember donation progress. This tool fetches and parses your Movember donation page HTML to extract donation data, providing it in a format perfect for stream overlays or websites.
 

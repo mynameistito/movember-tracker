@@ -78,7 +78,7 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
       // Target the specific CSS class for raised amount
       const raisedElement = document.querySelector(".donationProgress--amount__raised");
       if (raisedElement) {
-        const raisedText = raisedElement.textContent || raisedElement.innerText || "";
+        const raisedText = raisedElement.textContent || "";
         const raisedMatch = raisedText.match(/\$([\d,]+)/);
         if (raisedMatch) {
           raised = raisedMatch[1];
@@ -88,7 +88,7 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
       // Target the specific CSS class for target amount
       const targetElement = document.querySelector(".donationProgress--amount__target");
       if (targetElement) {
-        const targetText = targetElement.textContent || targetElement.innerText || "";
+        const targetText = targetElement.textContent || "";
         const targetMatch = targetText.match(/\$([\d,]+)/);
         if (targetMatch) {
           target = targetMatch[1];
@@ -233,7 +233,11 @@ export default {
           },
         });
       } else if (pathname === "/") {
-        // Return HTML with amount raised in Inter font
+        // Return HTML with horizontal progress bar
+        const percentage = data.percentage || 0;
+        const amount = data.amount || "$0";
+        const target = data.target || "$0";
+        
         const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -257,48 +261,127 @@ export default {
       min-height: 100vh;
       background: #000;
       color: #fff;
+      padding: 20px;
     }
-    .amount {
-      font-size: 72px;
+    .container {
+      width: 100%;
+      max-width: 1200px;
+    }
+    .progress-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      width: 100%;
+    }
+    .amount-label {
+      font-size: 48px;
       font-weight: 700;
       letter-spacing: -0.02em;
+      white-space: nowrap;
+      min-width: 200px;
+      text-align: right;
       transition: opacity 0.3s ease;
     }
-    .amount.updating {
+    .amount-label.updating {
       opacity: 0.7;
+    }
+    .progress-bar-wrapper {
+      flex: 1;
+      height: 60px;
+      background: #1a1a1a;
+      border-radius: 30px;
+      position: relative;
+      overflow: hidden;
+      border: 2px solid #333;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: ${Math.min(percentage, 100)}%;
+      background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+      border-radius: 30px;
+      transition: width 0.5s ease;
+    }
+    .target-label {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      min-width: 200px;
+      text-align: left;
+      transition: opacity 0.3s ease;
+    }
+    .target-label.updating {
+      opacity: 0.7;
+    }
+    @media (max-width: 768px) {
+      .progress-container {
+        flex-direction: column;
+        gap: 15px;
+      }
+      .amount-label, .target-label {
+        font-size: 36px;
+        min-width: auto;
+        text-align: center;
+      }
+      .progress-bar-wrapper {
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="amount" id="amount">${data.amount}</div>
+  <div class="container">
+    <div class="progress-container">
+      <div class="amount-label" id="amount">${amount}</div>
+      <div class="progress-bar-wrapper">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+      <div class="target-label" id="target">${target}</div>
+    </div>
+  </div>
   <script>
     const amountElement = document.getElementById('amount');
-    let currentAmount = '${data.amount}';
+    const targetElement = document.getElementById('target');
+    const progressBar = document.getElementById('progressBar');
+    let currentData = {
+      amount: '${amount}',
+      target: '${target}',
+      percentage: ${percentage}
+    };
     
-    async function updateAmount() {
+    async function updateData() {
       try {
         const response = await fetch('/json');
         const data = await response.json();
         
-        if (data.amount && data.amount !== currentAmount) {
+        if (data.amount && (data.amount !== currentData.amount || data.target !== currentData.target)) {
           amountElement.classList.add('updating');
+          targetElement.classList.add('updating');
           
           setTimeout(() => {
-            amountElement.textContent = data.amount;
-            currentAmount = data.amount;
+            amountElement.textContent = data.amount || '$0';
+            targetElement.textContent = data.target || '$0';
+            const percentage = data.percentage || 0;
+            progressBar.style.width = Math.min(percentage, 100) + '%';
+            currentData = {
+              amount: data.amount || '$0',
+              target: data.target || '$0',
+              percentage: percentage
+            };
             amountElement.classList.remove('updating');
+            targetElement.classList.remove('updating');
           }, 150);
         }
       } catch (error) {
-        console.error('Failed to update amount:', error);
+        console.error('Failed to update data:', error);
       }
     }
     
     // Update every 30 seconds (cache is 5 minutes, but we check more frequently)
-    setInterval(updateAmount, 30000);
+    setInterval(updateData, 30000);
     
     // Also update immediately on page load after a short delay
-    setTimeout(updateAmount, 1000);
+    setTimeout(updateData, 1000);
   </script>
 </body>
 </html>`;

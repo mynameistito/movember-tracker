@@ -170,7 +170,19 @@ const isValidNumber = (value: string): boolean => {
   }
   // Remove commas, spaces, and currency symbols, then check if we have at least one digit
   const cleaned = value.replace(/[,.\s$€£¥]/g, '');
-  return /^\d+$/.test(cleaned) && cleaned.length > 0;
+  // Must have at least one digit and be a valid number
+  if (!cleaned || cleaned.length === 0 || !/^\d+$/.test(cleaned)) {
+    return false;
+  }
+  // Additional check: the original value should contain at least one digit
+  if (!/\d/.test(value)) {
+    return false;
+  }
+  // Reject if value is just commas, spaces, or currency symbols
+  if (/^[,.\s$€£¥]+$/.test(value)) {
+    return false;
+  }
+  return true;
 };
 
 // Helper function to calculate percentage
@@ -254,8 +266,17 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
       const pattern = raisedPatterns[i];
       const match = html.match(pattern);
       if (match) {
-        const captured = match[match.length - 1]; // Get the last capture group (the amount)
-        console.log(`[SCRAPE] Pattern ${i + 1} matched, captured: "${captured}"`);
+        // Get the last capture group (the amount), but also check all groups
+        let captured = match[match.length - 1];
+        
+        // If the last group is empty or invalid, try the second-to-last
+        if (!captured || !isValidNumber(captured)) {
+          if (match.length > 2) {
+            captured = match[match.length - 2];
+          }
+        }
+        
+        console.log(`[SCRAPE] Pattern ${i + 1} matched, all groups:`, match.slice(1), `using: "${captured}"`);
         
         // Validate that we captured a valid number
         if (isValidNumber(captured)) {
@@ -294,8 +315,17 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
       const pattern = targetPatterns[i];
       const match = html.match(pattern);
       if (match) {
-        const captured = match[match.length - 1]; // Get the last capture group (the amount)
-        console.log(`[SCRAPE] Target pattern ${i + 1} matched, captured: "${captured}"`);
+        // Get the last capture group (the amount), but also check all groups
+        let captured = match[match.length - 1];
+        
+        // If the last group is empty or invalid, try the second-to-last
+        if (!captured || !isValidNumber(captured)) {
+          if (match.length > 2) {
+            captured = match[match.length - 2];
+          }
+        }
+        
+        console.log(`[SCRAPE] Target pattern ${i + 1} matched, all groups:`, match.slice(1), `using: "${captured}"`);
         
         // Validate that we captured a valid number
         if (isValidNumber(captured)) {
@@ -371,6 +401,73 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
       }
     }
     
+    // Last resort: Look for any dollar amounts in the HTML (more generic patterns)
+    if (!raised) {
+      console.log(`[SCRAPE] Trying generic dollar amount patterns as last resort...`);
+      const genericPatterns = [
+        // Look for $X,XXX pattern in common HTML structures
+        /\$([\d,]+(?:\.\d+)?)\s*(?:raised|donated|collected)/i,
+        /(?:raised|donated|collected)[:\s]*\$([\d,]+(?:\.\d+)?)/i,
+        // Look for amounts in div/span elements
+        /<[^>]+class="[^"]*(?:amount|raised|donation|progress)[^"]*"[^>]*>\s*\$?([\d,]+(?:\.\d+)?)/i,
+        // Look for amounts in data attributes
+        /data-[^=]*amount[^=]*=["']?\$?([\d,]+(?:\.\d+)?)/i,
+        // Look for amounts near "of" or "out of" (progress indicators)
+        /\$([\d,]+(?:\.\d+)?)\s*(?:of|out of)/i,
+        // Look for amounts in JSON-like structures without quotes
+        /raised[:\s=]+[\$]?([\d,]+(?:\.\d+)?)/i,
+        /amount[:\s=]+[\$]?([\d,]+(?:\.\d+)?)/i,
+      ];
+      
+      for (let i = 0; i < genericPatterns.length; i++) {
+        const pattern = genericPatterns[i];
+        const match = html.match(pattern);
+        if (match) {
+          const captured = match[1];
+          if (isValidNumber(captured)) {
+            raised = captured;
+            console.log(`[SCRAPE] Found valid raised amount using generic pattern ${i + 1}: ${raised}`);
+            break;
+          } else {
+            console.warn(`[SCRAPE] Generic pattern ${i + 1} matched but invalid number: "${captured}"`);
+          }
+        }
+      }
+    }
+    
+    if (!target) {
+      console.log(`[SCRAPE] Trying generic target amount patterns as last resort...`);
+      const genericTargetPatterns = [
+        // Look for $X,XXX pattern with target/goal keywords
+        /\$([\d,]+(?:\.\d+)?)\s*(?:target|goal)/i,
+        /(?:target|goal)[:\s]*\$([\d,]+(?:\.\d+)?)/i,
+        // Look for "of $X,XXX" patterns
+        /of\s+\$([\d,]+(?:\.\d+)?)/i,
+        // Look for amounts in target-related elements
+        /<[^>]+class="[^"]*(?:target|goal)[^"]*"[^>]*>\s*\$?([\d,]+(?:\.\d+)?)/i,
+        // Look for target in data attributes
+        /data-[^=]*(?:target|goal)[^=]*=["']?\$?([\d,]+(?:\.\d+)?)/i,
+        // Look for target in JSON-like structures
+        /target[:\s=]+[\$]?([\d,]+(?:\.\d+)?)/i,
+        /goal[:\s=]+[\$]?([\d,]+(?:\.\d+)?)/i,
+      ];
+      
+      for (let i = 0; i < genericTargetPatterns.length; i++) {
+        const pattern = genericTargetPatterns[i];
+        const match = html.match(pattern);
+        if (match) {
+          const captured = match[1];
+          if (isValidNumber(captured)) {
+            target = captured;
+            console.log(`[SCRAPE] Found valid target amount using generic pattern ${i + 1}: ${target}`);
+            break;
+          } else {
+            console.warn(`[SCRAPE] Generic target pattern ${i + 1} matched but invalid number: "${captured}"`);
+          }
+        }
+      }
+    }
+    
     const extractDuration = Date.now() - extractStart;
     console.log(`[SCRAPE] Data extraction completed in ${formatDuration(extractDuration)}`);
     console.log(`[SCRAPE] Raw extracted data for memberId ${memberId} (subdomain: ${subdomain}):`, { 
@@ -378,18 +475,43 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
       target: target || "NOT FOUND" 
     });
 
-    if (!raised) {
+    // Final validation check - ensure raised is actually valid before using
+    if (!raised || !isValidNumber(raised)) {
+      // Debug: Try to find any dollar amounts in the HTML to help diagnose
+      const allDollarAmounts = html.match(/\$[\d,]+(?:\.\d+)?/g);
+      console.warn(`[SCRAPE] Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML:`, 
+        allDollarAmounts ? allDollarAmounts.slice(0, 10) : []); // Show first 10
+      
+      // Try to find any numbers that might be amounts
+      const potentialAmounts = html.match(/[\d,]{3,}(?:\.\d+)?/g);
+      console.warn(`[SCRAPE] Found ${potentialAmounts ? potentialAmounts.length : 0} potential amount numbers in HTML (showing first 20):`, 
+        potentialAmounts ? potentialAmounts.slice(0, 20) : []);
+      
       const errorDetails = {
         memberId,
         subdomain,
         url: movemberUrl,
-        message: "Could not find raised amount in HTML. The page may require JavaScript execution or the HTML structure may have changed."
+        message: "Could not find raised amount in HTML. The page may require JavaScript execution or the HTML structure may have changed.",
+        htmlLength: html.length,
+        dollarAmountsFound: allDollarAmounts ? allDollarAmounts.length : 0,
+        raisedValue: raised || "empty"
       };
       console.error(`[SCRAPE] Failed to extract raised amount:`, errorDetails);
-      throw new Error(`Could not find raised amount in HTML for memberId ${memberId} (subdomain: ${subdomain}). The page may require JavaScript execution or the HTML structure may have changed.`);
+      throw new Error(`Could not find raised amount in HTML for memberId ${memberId} (subdomain: ${subdomain}). The page may require JavaScript execution or the HTML structure may have changed. Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML.`);
+    }
+
+    // Double-check that raised is valid before parsing
+    if (!isValidNumber(raised)) {
+      throw new Error(`Invalid raised value captured: "${raised}" for memberId ${memberId}`);
     }
 
     const { value: raisedValue, currency } = parseAmount(`$${raised}`);
+    
+    // Validate the parsed value is not empty or zero (unless it's actually zero)
+    if (!raisedValue || raisedValue === "0" || raisedValue === "") {
+      console.warn(`[SCRAPE] Parsed raised value is invalid: "${raisedValue}" from input: "${raised}"`);
+    }
+    
     const raisedFormatted = `$${raisedValue}`;
     
     let result: ScrapedData = {
@@ -398,11 +520,13 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
       timestamp: Date.now(),
     };
 
-    if (target) {
+    if (target && isValidNumber(target)) {
       const { value: targetValue } = parseAmount(`$${target}`);
       const targetFormatted = `$${targetValue}`;
       result.target = targetFormatted;
       result.percentage = calculatePercentage(raisedValue, targetValue);
+    } else if (target) {
+      console.warn(`[SCRAPE] Target value "${target}" failed validation, skipping target`);
     }
 
     const totalDuration = Date.now() - startTime;

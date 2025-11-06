@@ -135,11 +135,42 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const parseAmount = (text: string): { value: string; currency: string } => {
   // Remove whitespace and extract currency symbol and amount
   const cleaned = text.trim();
-  const currencyMatch = cleaned.match(/^([$€£¥]|AUD|USD|EUR|GBP|JPY)\s*/i);
-  const currency = currencyMatch ? (cleaned.startsWith("$") ? "AUD" : currencyMatch[1].toUpperCase()) : "AUD";
+  
+  // Try to match currency codes first (USD, EUR, GBP, AUD, etc.)
+  const currencyCodeMatch = cleaned.match(/\b(USD|EUR|GBP|AUD|JPY|CAD|NZD)\b/i);
+  if (currencyCodeMatch) {
+    const currency = currencyCodeMatch[1].toUpperCase();
+    // Extract amount after currency code
+    const amountMatch = cleaned.replace(currencyCodeMatch[0], '').match(/[\d,]+\.?\d*/);
+    const amount = amountMatch ? amountMatch[0] : "0";
+    return { value: amount, currency };
+  }
+  
+  // Try to match currency symbols ($, €, £, ¥)
+  const currencySymbolMatch = cleaned.match(/^([$€£¥])/);
+  let currency = "AUD"; // Default
+  if (currencySymbolMatch) {
+    const symbol = currencySymbolMatch[1];
+    if (symbol === "$") currency = "AUD";
+    else if (symbol === "€") currency = "EUR";
+    else if (symbol === "£") currency = "GBP";
+    else if (symbol === "¥") currency = "JPY";
+  }
+  
+  // Extract amount (supports numbers with commas and optional decimals)
   const amountMatch = cleaned.match(/[\d,]+\.?\d*/);
   const amount = amountMatch ? amountMatch[0] : "0";
   return { value: amount, currency };
+};
+
+// Helper function to validate that a captured value is a valid number
+const isValidNumber = (value: string): boolean => {
+  if (!value || typeof value !== 'string') {
+    return false;
+  }
+  // Remove commas, spaces, and currency symbols, then check if we have at least one digit
+  const cleaned = value.replace(/[,.\s$€£¥]/g, '');
+  return /^\d+$/.test(cleaned) && cleaned.length > 0;
 };
 
 // Helper function to calculate percentage
@@ -200,38 +231,80 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
     // Try multiple patterns to find the data
     const raisedPatterns = [
       // Pattern 1: Look for the CSS class with amount
-      /donationProgress--amount__raised[^>]*>([^<]*\$([\d,]+)[^<]*)/i,
+      /donationProgress--amount__raised[^>]*>([^<]*\$([\d,]+(?:\.\d+)?)[^<]*)/i,
       // Pattern 2: Look for the class followed by text content
-      /class="[^"]*donationProgress--amount__raised[^"]*"[^>]*>[\s\S]*?\$([\d,]+)/i,
-      // Pattern 3: Look for data attributes or JSON
-      /"raised"[:\s]*\$?([\d,]+)/i,
+      /class="[^"]*donationProgress--amount__raised[^"]*"[^>]*>[\s\S]*?\$([\d,]+(?:\.\d+)?)/i,
+      // Pattern 3: Look for data attributes or JSON with proper number format
+      /"raised"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 4: Look for raisedAmount or similar
+      /"raisedAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 5: Look for currentAmount or similar
+      /"currentAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 6: Look for amount in data attributes
+      /data-raised=["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 7: Look for amount in data-amount attribute
+      /data-amount=["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 8: Support different currency formats (€, £, etc.)
+      /donationProgress--amount__raised[^>]*>([^<]*[€£$]([\d,]+(?:\.\d+)?)[^<]*)/i,
+      // Pattern 9: Look for currency codes (USD, EUR, GBP, etc.)
+      /donationProgress--amount__raised[^>]*>([^<]*(?:USD|EUR|GBP|AUD)\s*([\d,]+(?:\.\d+)?)[^<]*)/i,
     ];
     
-    for (const pattern of raisedPatterns) {
+    for (let i = 0; i < raisedPatterns.length; i++) {
+      const pattern = raisedPatterns[i];
       const match = html.match(pattern);
       if (match) {
-        raised = match[match.length - 1]; // Get the last capture group (the amount)
-        console.log(`[SCRAPE] Found raised amount using pattern: ${raised}`);
-        break;
+        const captured = match[match.length - 1]; // Get the last capture group (the amount)
+        console.log(`[SCRAPE] Pattern ${i + 1} matched, captured: "${captured}"`);
+        
+        // Validate that we captured a valid number
+        if (isValidNumber(captured)) {
+          raised = captured;
+          console.log(`[SCRAPE] Found valid raised amount using pattern ${i + 1}: ${raised}`);
+          break;
+        } else {
+          console.warn(`[SCRAPE] Pattern ${i + 1} matched but invalid number: "${captured}", trying next pattern...`);
+        }
       }
     }
     
     // Look for the target amount in the HTML
     const targetPatterns = [
       // Pattern 1: Look for the CSS class with amount
-      /donationProgress--amount__target[^>]*>([^<]*\$([\d,]+)[^<]*)/i,
+      /donationProgress--amount__target[^>]*>([^<]*\$([\d,]+(?:\.\d+)?)[^<]*)/i,
       // Pattern 2: Look for the class followed by text content
-      /class="[^"]*donationProgress--amount__target[^"]*"[^>]*>[\s\S]*?\$([\d,]+)/i,
-      // Pattern 3: Look for data attributes or JSON
-      /"target"[:\s]*\$?([\d,]+)/i,
+      /class="[^"]*donationProgress--amount__target[^"]*"[^>]*>[\s\S]*?\$([\d,]+(?:\.\d+)?)/i,
+      // Pattern 3: Look for data attributes or JSON with proper number format
+      /"target"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 4: Look for targetAmount or similar
+      /"targetAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 5: Look for goal or similar
+      /"goal"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 6: Look for amount in data attributes
+      /data-target=["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 7: Look for amount in data-goal attribute
+      /data-goal=["']?\$?([\d,]+(?:\.\d+)?)/i,
+      // Pattern 8: Support different currency formats (€, £, etc.)
+      /donationProgress--amount__target[^>]*>([^<]*[€£$]([\d,]+(?:\.\d+)?)[^<]*)/i,
+      // Pattern 9: Look for currency codes (USD, EUR, GBP, etc.)
+      /donationProgress--amount__target[^>]*>([^<]*(?:USD|EUR|GBP|AUD)\s*([\d,]+(?:\.\d+)?)[^<]*)/i,
     ];
     
-    for (const pattern of targetPatterns) {
+    for (let i = 0; i < targetPatterns.length; i++) {
+      const pattern = targetPatterns[i];
       const match = html.match(pattern);
       if (match) {
-        target = match[match.length - 1]; // Get the last capture group (the amount)
-        console.log(`[SCRAPE] Found target amount using pattern: ${target}`);
-        break;
+        const captured = match[match.length - 1]; // Get the last capture group (the amount)
+        console.log(`[SCRAPE] Target pattern ${i + 1} matched, captured: "${captured}"`);
+        
+        // Validate that we captured a valid number
+        if (isValidNumber(captured)) {
+          target = captured;
+          console.log(`[SCRAPE] Found valid target amount using pattern ${i + 1}: ${target}`);
+          break;
+        } else {
+          console.warn(`[SCRAPE] Target pattern ${i + 1} matched but invalid number: "${captured}", trying next pattern...`);
+        }
       }
     }
     
@@ -241,24 +314,57 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
       const scriptTagMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
       if (scriptTagMatches) {
         for (const scriptTag of scriptTagMatches) {
-          // Look for JSON data containing donation amounts
-          const jsonPatterns = [
-            /"raised"[:\s]*\$?([\d,]+)/i,
-            /"target"[:\s]*\$?([\d,]+)/i,
-            /"amount"[:\s]*\$?([\d,]+)/i,
-            /"donationAmount"[:\s]*\$?([\d,]+)/i,
-            /"goal"[:\s]*\$?([\d,]+)/i,
+          // Look for JSON data containing donation amounts with improved patterns
+          const raisedJsonPatterns = [
+            /"raised"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /"raisedAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /"currentAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /"donationAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /"amount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /raised[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
           ];
           
-          for (const pattern of jsonPatterns) {
-            const match = scriptTag.match(pattern);
-            if (match && !raised) {
-              raised = match[1];
-              console.log(`[SCRAPE] Found raised amount in JSON: ${raised}`);
+          const targetJsonPatterns = [
+            /"target"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /"targetAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /"goal"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /target[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+            /goal[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+          ];
+          
+          // Try to find raised amount in JSON
+          if (!raised) {
+            for (let i = 0; i < raisedJsonPatterns.length; i++) {
+              const pattern = raisedJsonPatterns[i];
+              const match = scriptTag.match(pattern);
+              if (match) {
+                const captured = match[1];
+                if (isValidNumber(captured)) {
+                  raised = captured;
+                  console.log(`[SCRAPE] Found valid raised amount in JSON using pattern ${i + 1}: ${raised}`);
+                  break;
+                } else {
+                  console.warn(`[SCRAPE] JSON raised pattern ${i + 1} matched but invalid number: "${captured}"`);
+                }
+              }
             }
-            if (match && !target) {
-              target = match[1];
-              console.log(`[SCRAPE] Found target amount in JSON: ${target}`);
+          }
+          
+          // Try to find target amount in JSON
+          if (!target) {
+            for (let i = 0; i < targetJsonPatterns.length; i++) {
+              const pattern = targetJsonPatterns[i];
+              const match = scriptTag.match(pattern);
+              if (match) {
+                const captured = match[1];
+                if (isValidNumber(captured)) {
+                  target = captured;
+                  console.log(`[SCRAPE] Found valid target amount in JSON using pattern ${i + 1}: ${target}`);
+                  break;
+                } else {
+                  console.warn(`[SCRAPE] JSON target pattern ${i + 1} matched but invalid number: "${captured}"`);
+                }
+              }
             }
           }
         }
@@ -267,10 +373,20 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
     
     const extractDuration = Date.now() - extractStart;
     console.log(`[SCRAPE] Data extraction completed in ${formatDuration(extractDuration)}`);
-    console.log(`[SCRAPE] Raw extracted data:`, { raised: raised || "NOT FOUND", target: target || "NOT FOUND" });
+    console.log(`[SCRAPE] Raw extracted data for memberId ${memberId} (subdomain: ${subdomain}):`, { 
+      raised: raised || "NOT FOUND", 
+      target: target || "NOT FOUND" 
+    });
 
     if (!raised) {
-      throw new Error("Could not find raised amount in HTML. The page may require JavaScript execution.");
+      const errorDetails = {
+        memberId,
+        subdomain,
+        url: movemberUrl,
+        message: "Could not find raised amount in HTML. The page may require JavaScript execution or the HTML structure may have changed."
+      };
+      console.error(`[SCRAPE] Failed to extract raised amount:`, errorDetails);
+      throw new Error(`Could not find raised amount in HTML for memberId ${memberId} (subdomain: ${subdomain}). The page may require JavaScript execution or the HTML structure may have changed.`);
     }
 
     const { value: raisedValue, currency } = parseAmount(`$${raised}`);

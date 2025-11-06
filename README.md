@@ -31,34 +31,6 @@ This project creates a Cloudflare Worker that automatically checks your Movember
 4. **Root directory:** Leave as `/`
 5. Click **"Save and Deploy"**
 
-### Step 4: Create KV Namespace
-
-1. In the Cloudflare Dashboard, go to **"Workers & Pages"**
-2. Click on your Worker name
-3. Go to the **"Settings"** tab
-4. Scroll down to **"Variables"** section
-5. Click **"Add binding"** under **"KV Namespace Bindings"**
-6. **Variable name:** `CACHE`
-7. Click **"Create new namespace"**
-8. Name it `CACHE` and click **"Add"**
-9. Click **"Save"**
-
-### Step 5: Configure wrangler.jsonc
-
-Add the following bindings to your `wrangler.jsonc` file:
-
-```jsonc
-  "kv_namespaces": [
-    {
-      "binding": "CACHE",
-      "id": "your-kv-namespace-id"
-    }
-  ]
-}
-```
-
-Replace `your-kv-namespace-id` with the ID from your KV namespace (found in the Cloudflare Dashboard).
-
 ## Using Your Worker
 
 Once deployed, your Worker will be available at:
@@ -126,7 +98,6 @@ Manual overrides take precedence over auto-detection and are also cached.
 
 **Worker shows errors:**
 - Check the **"Logs"** tab in your Worker dashboard
-- Make sure your KV namespace binding is named `CACHE`
 - If you see "Could not find raised amount in HTML", the page structure may have changed or requires JavaScript execution
 
 **Wrong donation amount:**

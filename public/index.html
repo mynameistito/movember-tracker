@@ -7,437 +7,99 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #e0e0e0;
-      line-height: 1.6;
-      padding: 0;
-      padding-bottom: 60px;
-      min-height: 100vh;
-    }
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 60px 20px;
-    }
-    header {
-      text-align: center;
-      margin-bottom: 60px;
-    }
-    h1 {
-      font-size: 48px;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 16px;
-      letter-spacing: -0.02em;
-    }
-    .subtitle {
-      font-size: 20px;
-      color: #b0b0b0;
-      font-weight: 400;
-      margin-bottom: 8px;
-    }
-    .description {
-      font-size: 16px;
-      color: #999;
-      max-width: 600px;
-      margin: 0 auto 40px;
-    }
-    section {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 32px;
-      margin-bottom: 32px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    h2 {
-      font-size: 28px;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    h2::before {
-      content: '';
-      width: 4px;
-      height: 28px;
-      background: linear-gradient(180deg, #4CAF50 0%, #45a049 100%);
-      border-radius: 2px;
-    }
-    h3 {
-      font-size: 20px;
-      font-weight: 600;
-      color: #fff;
-      margin-top: 24px;
-      margin-bottom: 12px;
-    }
-    p {
-      color: #ccc;
-      margin-bottom: 16px;
-      font-size: 16px;
-    }
-    .code-block {
-      background: #0a0a0f;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 20px;
-      margin: 16px 0;
-      overflow-x: auto;
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    .code-block code {
-      color: #4CAF50;
-    }
-    .url-example {
-      background: #0a0a0f;
-      border-left: 3px solid #4CAF50;
-      padding: 12px 16px;
-      margin: 12px 0;
-      border-radius: 4px;
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      font-size: 14px;
-      color: #fff;
-      word-break: break-all;
-    }
-    .url-example .method {
-      color: #4CAF50;
-      font-weight: 600;
-      margin-right: 8px;
-    }
-    ul {
-      list-style: none;
-      padding-left: 0;
-    }
-    li {
-      color: #ccc;
-      margin-bottom: 12px;
-      padding-left: 24px;
-      position: relative;
-    }
-    li::before {
-      content: '→';
-      position: absolute;
-      left: 0;
-      color: #4CAF50;
-      font-weight: bold;
-    }
-    .json-example {
-      background: #0a0a0f;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 20px;
-      margin: 16px 0;
-      overflow-x: auto;
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      font-size: 14px;
-      line-height: 1.5;
-      color: #e0e0e0;
-    }
-    .json-key {
-      color: #9cdcfe;
-    }
-    .json-string {
-      color: #ce9178;
-    }
-    .json-number {
-      color: #b5cea8;
-    }
-    .badge {
-      display: inline-block;
-      background: rgba(76, 175, 80, 0.2);
-      color: #4CAF50;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-left: 8px;
-    }
-    .note {
-      background: rgba(255, 193, 7, 0.1);
-      border-left: 3px solid #ffc107;
-      padding: 12px 16px;
-      margin: 16px 0;
-      border-radius: 4px;
-      color: #ffc107;
-      font-size: 14px;
-    }
-    .data-display {
-      background: rgba(76, 175, 80, 0.1);
-      border-left: 3px solid #4CAF50;
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    .data-display h3 {
-      margin-top: 0;
-      color: #4CAF50;
-    }
-    .data-item {
-      margin: 12px 0;
-      font-size: 18px;
-    }
-    .data-label {
-      color: #aaa;
-      font-weight: 500;
-      margin-right: 8px;
-    }
-    .data-value {
-      color: #fff;
-      font-weight: 600;
-    }
-    .input-group {
-      margin: 20px 0;
-    }
-    .input-group label {
-      display: block;
-      color: #ccc;
-      margin-bottom: 8px;
-      font-weight: 500;
-    }
-    .input-group input {
-      width: 100%;
-      padding: 12px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      color: #fff;
-      font-size: 16px;
-      font-family: inherit;
-    }
-    .input-group input:focus {
-      outline: none;
-      border-color: #4CAF50;
-    }
-    .button {
-      background: linear-gradient(180deg, #4CAF50 0%, #45a049 100%);
-      color: #fff;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    .button:hover {
-      opacity: 0.9;
-    }
-    .button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .loading {
-      color: #4CAF50;
-      font-style: italic;
-    }
-    .error {
-      color: #ff4444;
-      background: rgba(255, 68, 68, 0.1);
-      border-left: 3px solid #ff4444;
-      padding: 12px 16px;
-      margin: 16px 0;
-      border-radius: 4px;
-    }
-    footer {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 12px 20px;
-      text-align: center;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #999;
-      font-size: 13px;
-      z-index: 1000;
-    }
-    .footer-content {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    footer p {
-      display: inline;
-      margin: 0;
-      color: #999;
-    }
-    footer a {
-      color: #4CAF50;
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    footer a:hover {
-      color: #fff;
-    }
-    .footer-separator {
-      color: #666;
-      margin: 0 4px;
-    }
-    .social-links {
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
-      gap: 12px;
-      margin-left: 8px;
-    }
-    .social-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
-      transition: transform 0.2s, opacity 0.2s;
-    }
-    .social-link:hover {
-      transform: translateY(-2px);
-      opacity: 1;
-    }
-    .social-link svg {
-      width: 100%;
-      height: 100%;
-      fill: #b0b0b0;
-      transition: fill 0.2s;
-    }
-    .social-link:hover svg {
-      fill: #4CAF50;
-    }
-    @media (max-width: 768px) {
-      h1 {
-        font-size: 36px;
-      }
-      .subtitle {
-        font-size: 18px;
-      }
-      section {
-        padding: 24px;
-      }
-      .container {
-        padding: 40px 16px;
-      }
-      body {
-        padding-bottom: 80px;
-      }
-      footer {
-        padding: 10px 16px;
-        font-size: 12px;
-      }
-      .footer-content {
-        flex-direction: column;
-        gap: 8px;
-      }
-      .social-links {
-        margin-left: 0;
-        gap: 12px;
-      }
-      .social-link {
-        width: 24px;
-        height: 24px;
-      }
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <header>
-      <h1>Movember Donation Tracker</h1>
-      <p class="subtitle">API Documentation</p>
-      <p class="description">
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-gray-200 leading-relaxed pb-[60px] md:pb-20 min-h-screen font-['Inter',system-ui,sans-serif]">
+  <div class="max-w-4xl mx-auto px-5 py-[60px] md:py-16 md:px-5">
+    <header class="text-center mb-[60px]">
+      <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">Movember Donation Tracker</h1>
+      <p class="text-lg md:text-xl text-gray-400 font-normal mb-2">API Documentation</p>
+      <p class="text-base text-gray-500 max-w-2xl mx-auto mb-10">
         Automatically track Movember donation progress. This service fetches and caches donation data from Movember pages, 
         providing it in a format perfect for stream overlays, websites, or other applications.
       </p>
     </header>
 
-    <section>
-      <h2>Live Data Display</h2>
-      <div class="input-group">
-        <label for="memberId">Member ID:</label>
-        <input type="text" id="memberId" placeholder="Enter member ID (default: 14810348)" value="14810348">
+    <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">Live Data Display</h2>
+      <div class="my-5">
+        <label for="memberId" class="block text-gray-300 mb-2 font-medium">Member ID:</label>
+        <input type="text" id="memberId" placeholder="Enter member ID (default: 14810348)" value="14810348" class="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white text-base font-inherit focus:outline-none focus:border-green-500 transition-colors">
       </div>
-      <button class="button" id="fetchButton" onclick="fetchData()">Fetch Data</button>
-      <button class="button" id="refreshButton" onclick="fetchData(true)" style="margin-left: 12px;">Force Refresh</button>
-      <button class="button" id="copyOverlayButton" onclick="copyOverlayUrl()" style="margin-left: 12px;">Copy Overlay URL</button>
+      <div class="flex flex-wrap gap-3 mb-5">
+        <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="fetchButton" onclick="fetchData()">Fetch Data</button>
+        <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="refreshButton" onclick="fetchData(true)">Force Refresh</button>
+        <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="copyOverlayButton" onclick="copyOverlayUrl()">Copy Overlay URL</button>
+      </div>
       <div id="dataDisplay"></div>
     </section>
 
-    <section>
-      <h2>What This Does</h2>
-      <p>
+    <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">What This Does</h2>
+      <p class="text-gray-300 mb-4 text-base">
         This client-side application automatically checks Movember donation pages and caches the current donation amount in your browser. 
         You can access this information through simple web links that return data in an easy-to-use format.
       </p>
-      <p>
+      <p class="text-gray-300 mb-4 text-base">
         The service handles multiple Movember members, automatically detects the correct subdomain (au.movember.com, fr.movember.com, etc.), 
         and caches results in localStorage for fast, efficient access.
       </p>
     </section>
 
-    <section>
-      <h2>JSON API Endpoint</h2>
-      <p>Get donation data in JSON format:</p>
-      <div class="url-example">
-        <span class="method">GET</span><span id="baseUrl">/json</span>
+    <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">JSON API Endpoint</h2>
+      <p class="text-gray-300 mb-4 text-base">Get donation data in JSON format:</p>
+      <div class="bg-black border-l-4 border-green-500 p-3 my-3 rounded font-mono text-sm text-white break-all">
+        <span class="text-green-500 font-semibold mr-2">GET</span><span id="baseUrl">/json</span>
       </div>
       
-      <h3>Response Format</h3>
-      <div class="json-example">
+      <h3 class="text-xl font-semibold text-white mt-6 mb-3">Response Format</h3>
+      <div class="bg-black border border-white/10 rounded-lg p-5 my-4 overflow-x-auto font-mono text-sm leading-relaxed text-gray-200">
 {<br>
-&nbsp;&nbsp;<span class="json-key">"amount"</span>: <span class="json-string">"$2,500"</span>,<br>
-&nbsp;&nbsp;<span class="json-key">"currency"</span>: <span class="json-string">"AUD"</span>,<br>
-&nbsp;&nbsp;<span class="json-key">"target"</span>: <span class="json-string">"$10,000"</span>,<br>
-&nbsp;&nbsp;<span class="json-key">"percentage"</span>: <span class="json-number">25</span>,<br>
-&nbsp;&nbsp;<span class="json-key">"timestamp"</span>: <span class="json-number">1704067200000</span><br>
+&nbsp;&nbsp;<span class="text-blue-300">"amount"</span>: <span class="text-orange-300">"$2,500"</span>,<br>
+&nbsp;&nbsp;<span class="text-blue-300">"currency"</span>: <span class="text-orange-300">"AUD"</span>,<br>
+&nbsp;&nbsp;<span class="text-blue-300">"target"</span>: <span class="text-orange-300">"$10,000"</span>,<br>
+&nbsp;&nbsp;<span class="text-blue-300">"percentage"</span>: <span class="text-green-300">25</span>,<br>
+&nbsp;&nbsp;<span class="text-blue-300">"timestamp"</span>: <span class="text-green-300">1704067200000</span><br>
 }
       </div>
     </section>
 
-    <section>
-      <h2>Overlay Endpoint</h2>
-      <p>Get a visual progress bar overlay perfect for streaming or embedding:</p>
-      <div class="url-example">
-        <span class="method">GET</span><span id="overlayUrl">/overlay</span>
+    <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">Overlay Endpoint</h2>
+      <p class="text-gray-300 mb-4 text-base">Get a visual progress bar overlay perfect for streaming or embedding:</p>
+      <div class="bg-black border-l-4 border-green-500 p-3 my-3 rounded font-mono text-sm text-white break-all">
+        <span class="text-green-500 font-semibold mr-2">GET</span><span id="overlayUrl">/overlay</span>
       </div>
-      <p>
+      <p class="text-gray-300 mb-4 text-base">
         The overlay displays the current donation amount, target, and a visual progress bar. 
         It automatically updates every 30 seconds and has a transparent background, making it perfect for OBS browser sources or stream overlays.
       </p>
     </section>
 
-    <section>
-      <h2>Using the memberId Parameter</h2>
-      <p>
-        Track any Movember member by adding the <code>memberId</code> query parameter to your URLs. 
+    <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">Using the memberId Parameter</h2>
+      <p class="text-gray-300 mb-4 text-base">
+        Track any Movember member by adding the <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId</code> query parameter to your URLs. 
         Each member ID has its own cache, so different members' data won't interfere with each other.
       </p>
 
-      <h3>Finding Your Movember Member ID</h3>
-      <ul>
-        <li>Go to your Movember donation page (e.g., <code>https://au.movember.com/donate/details?memberId=YOUR_ID</code>)</li>
-        <li>The number after <code>memberId=</code> in the URL is your member ID</li>
-        <li>Use that ID in the query parameter when accessing the API</li>
+      <h3 class="text-xl font-semibold text-white mt-6 mb-3">Finding Your Movember Member ID</h3>
+      <ul class="list-none pl-0">
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Go to your Movember donation page (e.g., <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">https://au.movember.com/donate/details?memberId=YOUR_ID</code>)</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">The number after <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId=</code> in the URL is your member ID</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Use that ID in the query parameter when accessing the API</li>
       </ul>
     </section>
 
-    <section>
-      <h2>How It Works</h2>
-      <ul>
-        <li>The client-side JavaScript fetches Movember page HTML using the Worker's CORS proxy</li>
-        <li>Parses the HTML using regex patterns to extract donation amounts</li>
-        <li>Results are cached in localStorage for 5 minutes to avoid excessive requests</li>
-        <li>Automatically detects the correct Movember subdomain</li>
-        <li>Subdomain mappings are cached in localStorage for 24 hours for optimal performance</li>
+    <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">How It Works</h2>
+      <ul class="list-none pl-0">
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">The client-side JavaScript fetches Movember page HTML using the Worker's CORS proxy</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Parses the HTML using regex patterns to extract donation amounts</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Results are cached in localStorage for 5 minutes to avoid excessive requests</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Automatically detects the correct Movember subdomain</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Subdomain mappings are cached in localStorage for 24 hours for optimal performance</li>
       </ul>
     </section>
   </div>
@@ -495,7 +157,7 @@
           // Show error message
           const displayDiv = document.getElementById('dataDisplay');
           displayDiv.innerHTML = `
-            <div class="error">
+            <div class="text-red-500 bg-red-500/10 border-l-4 border-red-500 p-3 my-4 rounded">
               <strong>Error:</strong> Failed to copy URL to clipboard. URL: ${overlayUrl}
             </div>
           `;
@@ -518,43 +180,43 @@
       fetchButton.disabled = true;
       refreshButton.disabled = true;
       copyOverlayButton.disabled = true;
-      displayDiv.innerHTML = '<div class="loading">Loading...</div>';
+      displayDiv.innerHTML = '<div class="text-green-500 italic">Loading...</div>';
 
       try {
         const { data, cacheStatus } = await getData(memberId, forceRefresh);
         
         displayDiv.innerHTML = `
-          <div class="data-display">
-            <h3>Donation Data (${cacheStatus})</h3>
-            <div class="data-item">
-              <span class="data-label">Amount:</span>
-              <span class="data-value">${data.amount || '$0'}</span>
+          <div class="bg-green-500/10 border-l-4 border-green-500 p-5 my-5 rounded">
+            <h3 class="mt-0 text-green-500 text-xl font-semibold mb-3">Donation Data (${cacheStatus})</h3>
+            <div class="my-3 text-lg">
+              <span class="text-gray-400 font-medium mr-2">Amount:</span>
+              <span class="text-white font-semibold">${data.amount || '$0'}</span>
             </div>
             ${data.target ? `
-            <div class="data-item">
-              <span class="data-label">Target:</span>
-              <span class="data-value">${data.target}</span>
+            <div class="my-3 text-lg">
+              <span class="text-gray-400 font-medium mr-2">Target:</span>
+              <span class="text-white font-semibold">${data.target}</span>
             </div>
             ` : ''}
             ${data.percentage !== undefined ? `
-            <div class="data-item">
-              <span class="data-label">Progress:</span>
-              <span class="data-value">${data.percentage}%</span>
+            <div class="my-3 text-lg">
+              <span class="text-gray-400 font-medium mr-2">Progress:</span>
+              <span class="text-white font-semibold">${data.percentage}%</span>
             </div>
             ` : ''}
-            <div class="data-item">
-              <span class="data-label">Currency:</span>
-              <span class="data-value">${data.currency || 'AUD'}</span>
+            <div class="my-3 text-lg">
+              <span class="text-gray-400 font-medium mr-2">Currency:</span>
+              <span class="text-white font-semibold">${data.currency || 'AUD'}</span>
             </div>
-            <div class="data-item">
-              <span class="data-label">Last Updated:</span>
-              <span class="data-value">${new Date(data.timestamp).toLocaleString()}</span>
+            <div class="my-3 text-lg">
+              <span class="text-gray-400 font-medium mr-2">Last Updated:</span>
+              <span class="text-white font-semibold">${new Date(data.timestamp).toLocaleString()}</span>
             </div>
           </div>
         `;
       } catch (error) {
         displayDiv.innerHTML = `
-          <div class="error">
+          <div class="text-red-500 bg-red-500/10 border-l-4 border-red-500 p-3 my-4 rounded">
             <strong>Error:</strong> ${error.message || 'Failed to fetch data'}
           </div>
         `;
@@ -574,22 +236,22 @@
     }
   </script>
 
-  <footer>
-    <div class="footer-content">
-      <p>This site is not affiliated with <a href="https://movember.com" target="_blank" rel="noopener noreferrer">Movember</a></p>
-      <span class="footer-separator">•</span>
-      <p>All Rights Reserved</p>
-      <span class="footer-separator">•</span>
-      <p>Made with Vibes by My Name is Tito</p>
-      <div class="social-links">
-        <a href="https://x.com/mynameistito" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="X (Twitter)">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><path d="M453.2 112L523.8 112L369.6 288.2L551 528L409 528L297.7 382.6L170.5 528L99.8 528L264.7 339.5L90.8 112L236.4 112L336.9 244.9L453.2 112zM428.4 485.8L467.5 485.8L215.1 152L173.1 152L428.4 485.8z"/></svg>
+  <footer class="fixed bottom-0 left-0 right-0 p-3 md:p-5 text-center border-t border-white/10 bg-gradient-to-br from-slate-900 to-slate-800 text-gray-500 text-xs md:text-sm z-[1000]">
+    <div class="flex flex-col md:flex-row justify-center items-center flex-wrap gap-2 md:gap-3">
+      <p class="inline m-0 text-gray-500">This site is not affiliated with <a href="https://movember.com" target="_blank" rel="noopener noreferrer" class="text-green-500 no-underline transition-colors duration-200 hover:text-white">Movember</a></p>
+      <span class="text-gray-600 mx-1">•</span>
+      <p class="inline m-0 text-gray-500">All Rights Reserved</p>
+      <span class="text-gray-600 mx-1">•</span>
+      <p class="inline m-0 text-gray-500">Made with Vibes by My Name is Tito</p>
+      <div class="inline-flex justify-center items-center gap-3 ml-0 md:ml-2">
+        <a href="https://x.com/mynameistito" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-6 h-6 md:w-8 md:h-8 transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-100" aria-label="X (Twitter)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="w-full h-full fill-gray-400 transition-colors duration-200 hover:fill-green-500"><path d="M453.2 112L523.8 112L369.6 288.2L551 528L409 528L297.7 382.6L170.5 528L99.8 528L264.7 339.5L90.8 112L236.4 112L336.9 244.9L453.2 112zM428.4 485.8L467.5 485.8L215.1 152L173.1 152L428.4 485.8z"/></svg>
         </a>
-        <a href="https://github.com/mynameistito" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="GitHub">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><path d="M237.9 461.4C237.9 463.4 235.6 465 232.7 465C229.4 465.3 227.1 463.7 227.1 461.4C227.1 459.4 229.4 457.8 232.3 457.8C235.3 457.5 237.9 459.1 237.9 461.4zM206.8 456.9C206.1 458.9 208.1 461.2 211.1 461.8C213.7 462.8 216.7 461.8 217.3 459.8C217.9 457.8 216 455.5 213 454.6C210.4 453.9 207.5 454.9 206.8 456.9zM251 455.2C248.1 455.9 246.1 457.8 246.4 460.1C246.7 462.1 249.3 463.4 252.3 462.7C255.2 462 257.2 460.1 256.9 458.1C256.6 456.2 253.9 454.9 251 455.2zM316.8 72C178.1 72 72 177.3 72 316C72 426.9 141.8 521.8 241.5 555.2C254.3 557.5 258.8 549.6 258.8 543.1C258.8 536.9 258.5 502.7 258.5 481.7C258.5 481.7 188.5 496.7 173.8 451.9C173.8 451.9 162.4 422.8 146 415.3C146 415.3 123.1 399.6 147.6 399.9C147.6 399.9 172.5 401.9 186.2 425.7C208.1 464.3 244.8 453.2 259.1 446.6C261.4 430.6 267.9 419.5 275.1 412.9C219.2 406.7 162.8 398.6 162.8 302.4C162.8 274.9 170.4 261.1 186.4 243.5C183.8 237 175.3 210.2 189 175.6C209.9 169.1 258 202.6 258 202.6C278 197 299.5 194.1 320.8 194.1C342.1 194.1 363.6 197 383.6 202.6C383.6 202.6 431.7 169 452.6 175.6C466.3 210.3 457.8 237 455.2 243.5C471.2 261.2 481 275 481 302.4C481 398.9 422.1 406.6 366.2 412.9C375.4 420.8 383.2 435.8 383.2 459.3C383.2 493 382.9 534.7 382.9 542.9C382.9 549.4 387.5 557.3 400.2 555C500.2 521.8 568 426.9 568 316C568 177.3 455.5 72 316.8 72zM169.2 416.9C167.9 417.9 168.2 420.2 169.9 422.1C171.5 423.7 173.8 424.4 175.1 423.1C176.4 422.1 176.1 419.8 174.4 417.9C172.8 416.3 170.5 415.6 169.2 416.9zM158.4 408.8C157.7 410.1 158.7 411.7 160.7 412.7C162.3 413.7 164.3 413.4 165 412C165.7 410.7 164.7 409.1 162.7 408.1C160.7 407.5 159.1 407.8 158.4 408.8zM190.8 444.4C189.2 445.7 189.8 448.7 192.1 450.6C194.4 452.9 197.3 453.2 198.6 451.6C199.9 450.3 199.3 447.3 197.3 445.4C195.1 443.1 192.1 442.8 190.8 444.4zM179.4 429.7C177.8 430.7 177.8 433.3 179.4 435.6C181 437.9 183.7 438.9 185 437.9C186.6 436.6 186.6 434 185 431.7C183.6 429.4 181 428.4 179.4 429.7z"/></svg>
+        <a href="https://github.com/mynameistito" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-6 h-6 md:w-8 md:h-8 transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-100" aria-label="GitHub">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="w-full h-full fill-gray-400 transition-colors duration-200 hover:fill-green-500"><path d="M237.9 461.4C237.9 463.4 235.6 465 232.7 465C229.4 465.3 227.1 463.7 227.1 461.4C227.1 459.4 229.4 457.8 232.3 457.8C235.3 457.5 237.9 459.1 237.9 461.4zM206.8 456.9C206.1 458.9 208.1 461.2 211.1 461.8C213.7 462.8 216.7 461.8 217.3 459.8C217.9 457.8 216 455.5 213 454.6C210.4 453.9 207.5 454.9 206.8 456.9zM251 455.2C248.1 455.9 246.1 457.8 246.4 460.1C246.7 462.1 249.3 463.4 252.3 462.7C255.2 462 257.2 460.1 256.9 458.1C256.6 456.2 253.9 454.9 251 455.2zM316.8 72C178.1 72 72 177.3 72 316C72 426.9 141.8 521.8 241.5 555.2C254.3 557.5 258.8 549.6 258.8 543.1C258.8 536.9 258.5 502.7 258.5 481.7C258.5 481.7 188.5 496.7 173.8 451.9C173.8 451.9 162.4 422.8 146 415.3C146 415.3 123.1 399.6 147.6 399.9C147.6 399.9 172.5 401.9 186.2 425.7C208.1 464.3 244.8 453.2 259.1 446.6C261.4 430.6 267.9 419.5 275.1 412.9C219.2 406.7 162.8 398.6 162.8 302.4C162.8 274.9 170.4 261.1 186.4 243.5C183.8 237 175.3 210.2 189 175.6C209.9 169.1 258 202.6 258 202.6C278 197 299.5 194.1 320.8 194.1C342.1 194.1 363.6 197 383.6 202.6C383.6 202.6 431.7 169 452.6 175.6C466.3 210.3 457.8 237 455.2 243.5C471.2 261.2 481 275 481 302.4C481 398.9 422.1 406.6 366.2 412.9C375.4 420.8 383.2 435.8 383.2 459.3C383.2 493 382.9 534.7 382.9 542.9C382.9 549.4 387.5 557.3 400.2 555C500.2 521.8 568 426.9 568 316C568 177.3 455.5 72 316.8 72zM169.2 416.9C167.9 417.9 168.2 420.2 169.9 422.1C171.5 423.7 173.8 424.4 175.1 423.1C176.4 422.1 176.1 419.8 174.4 417.9C172.8 416.3 170.5 415.6 169.2 416.9zM158.4 408.8C157.7 410.1 158.7 411.7 160.7 412.7C162.3 413.7 164.3 413.4 165 412C165.7 410.7 164.7 409.1 162.7 408.1C160.7 407.5 159.1 407.8 158.4 408.8zM190.8 444.4C189.2 445.7 189.8 448.7 192.1 450.6C194.4 452.9 197.3 453.2 198.6 451.6C199.9 450.3 199.3 447.3 197.3 445.4C195.1 443.1 192.1 442.8 190.8 444.4zM179.4 429.7C177.8 430.7 177.8 433.3 179.4 435.6C181 437.9 183.7 438.9 185 437.9C186.6 436.6 186.6 434 185 431.7C183.6 429.4 181 428.4 179.4 429.7z"/></svg>
         </a>
-        <a href="https://discord.com/users/611746802122620937" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Discord">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><path d="M524.5 133.8C524.3 133.5 524.1 133.2 523.7 133.1C485.6 115.6 445.3 103.1 404 96C403.6 95.9 403.2 96 402.9 96.1C402.6 96.2 402.3 96.5 402.1 96.9C396.6 106.8 391.6 117.1 387.2 127.5C342.6 120.7 297.3 120.7 252.8 127.5C248.3 117 243.3 106.8 237.7 96.9C237.5 96.6 237.2 96.3 236.9 96.1C236.6 95.9 236.2 95.9 235.8 95.9C194.5 103 154.2 115.5 116.1 133C115.8 133.1 115.5 133.4 115.3 133.7C39.1 247.5 18.2 358.6 28.4 468.2C28.4 468.5 28.5 468.7 28.6 469C28.7 469.3 28.9 469.4 29.1 469.6C73.5 502.5 123.1 527.6 175.9 543.8C176.3 543.9 176.7 543.9 177 543.8C177.3 543.7 177.7 543.4 177.9 543.1C189.2 527.7 199.3 511.3 207.9 494.3C208 494.1 208.1 493.8 208.1 493.5C208.1 493.2 208.1 493 208 492.7C207.9 492.4 207.8 492.2 207.6 492.1C207.4 492 207.2 491.8 206.9 491.7C191.1 485.6 175.7 478.3 161 469.8C160.7 469.6 160.5 469.4 160.3 469.2C160.1 469 160 468.6 160 468.3C160 468 160 467.7 160.2 467.4C160.4 467.1 160.5 466.9 160.8 466.7C163.9 464.4 167 462 169.9 459.6C170.2 459.4 170.5 459.2 170.8 459.2C171.1 459.2 171.5 459.2 171.8 459.3C268 503.2 372.2 503.2 467.3 459.3C467.6 459.2 468 459.1 468.3 459.1C468.6 459.1 469 459.3 469.2 459.5C472.1 461.9 475.2 464.4 478.3 466.7C478.5 466.9 478.7 467.1 478.9 467.4C479.1 467.7 479.1 468 479.1 468.3C479.1 468.6 479 468.9 478.8 469.2C478.6 469.5 478.4 469.7 478.2 469.8C463.5 478.4 448.2 485.7 432.3 491.6C432.1 491.7 431.8 491.8 431.6 492C431.4 492.2 431.3 492.4 431.2 492.7C431.1 493 431.1 493.2 431.1 493.5C431.1 493.8 431.2 494 431.3 494.3C440.1 511.3 450.1 527.6 461.3 543.1C461.5 543.4 461.9 543.7 462.2 543.8C462.5 543.9 463 543.9 463.3 543.8C516.2 527.6 565.9 502.5 610.4 469.6C610.6 469.4 610.8 469.2 610.9 469C611 468.8 611.1 468.5 611.1 468.2C623.4 341.4 590.6 231.3 524.2 133.7zM222.5 401.5C193.5 401.5 169.7 374.9 169.7 342.3C169.7 309.7 193.1 283.1 222.5 283.1C252.2 283.1 275.8 309.9 275.3 342.3C275.3 375 251.9 401.5 222.5 401.5zM417.9 401.5C388.9 401.5 365.1 374.9 365.1 342.3C365.1 309.7 388.5 283.1 417.9 283.1C447.6 283.1 471.2 309.9 470.7 342.3C470.7 375 447.5 401.5 417.9 401.5z"/></svg>
+        <a href="https://discord.com/users/611746802122620937" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-6 h-6 md:w-8 md:h-8 transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-100" aria-label="Discord">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="w-full h-full fill-gray-400 transition-colors duration-200 hover:fill-green-500"><path d="M524.5 133.8C524.3 133.5 524.1 133.2 523.7 133.1C485.6 115.6 445.3 103.1 404 96C403.6 95.9 403.2 96 402.9 96.1C402.6 96.2 402.3 96.5 402.1 96.9C396.6 106.8 391.6 117.1 387.2 127.5C342.6 120.7 297.3 120.7 252.8 127.5C248.3 117 243.3 106.8 237.7 96.9C237.5 96.6 237.2 96.3 236.9 96.1C236.6 95.9 236.2 95.9 235.8 95.9C194.5 103 154.2 115.5 116.1 133C115.8 133.1 115.5 133.4 115.3 133.7C39.1 247.5 18.2 358.6 28.4 468.2C28.4 468.5 28.5 468.7 28.6 469C28.7 469.3 28.9 469.4 29.1 469.6C73.5 502.5 123.1 527.6 175.9 543.8C176.3 543.9 176.7 543.9 177 543.8C177.3 543.7 177.7 543.4 177.9 543.1C189.2 527.7 199.3 511.3 207.9 494.3C208 494.1 208.1 493.8 208.1 493.5C208.1 493.2 208.1 493 208 492.7C207.9 492.4 207.8 492.2 207.6 492.1C207.4 492 207.2 491.8 206.9 491.7C191.1 485.6 175.7 478.3 161 469.8C160.7 469.6 160.5 469.4 160.3 469.2C160.1 469 160 468.6 160 468.3C160 468 160 467.7 160.2 467.4C160.4 467.1 160.5 466.9 160.8 466.7C163.9 464.4 167 462 169.9 459.6C170.2 459.4 170.5 459.2 170.8 459.2C171.1 459.2 171.5 459.2 171.8 459.3C268 503.2 372.2 503.2 467.3 459.3C467.6 459.2 468 459.1 468.3 459.1C468.6 459.1 469 459.3 469.2 459.5C472.1 461.9 475.2 464.4 478.3 466.7C478.5 466.9 478.7 467.1 478.9 467.4C479.1 467.7 479.1 468 479.1 468.3C479.1 468.6 479 468.9 478.8 469.2C478.6 469.5 478.4 469.7 478.2 469.8C463.5 478.4 448.2 485.7 432.3 491.6C432.1 491.7 431.8 491.8 431.6 492C431.4 492.2 431.3 492.4 431.2 492.7C431.1 493 431.1 493.2 431.1 493.5C431.1 493.8 431.2 494 431.3 494.3C440.1 511.3 450.1 527.6 461.3 543.1C461.5 543.4 461.9 543.7 462.2 543.8C462.5 543.9 463 543.9 463.3 543.8C516.2 527.6 565.9 502.5 610.4 469.6C610.6 469.4 610.8 469.2 610.9 469C611 468.8 611.1 468.5 611.1 468.2C623.4 341.4 590.6 231.3 524.2 133.7zM222.5 401.5C193.5 401.5 169.7 374.9 169.7 342.3C169.7 309.7 193.1 283.1 222.5 283.1C252.2 283.1 275.8 309.9 275.3 342.3C275.3 375 251.9 401.5 222.5 401.5zM417.9 401.5C388.9 401.5 365.1 374.9 365.1 342.3C365.1 309.7 388.5 283.1 417.9 283.1C447.6 283.1 471.2 309.9 470.7 342.3C470.7 375 447.5 401.5 417.9 401.5z"/></svg>
         </a>
       </div>
     </div>

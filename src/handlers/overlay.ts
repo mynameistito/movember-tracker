@@ -82,7 +82,7 @@ export async function handleOverlay(request: Request, env: Env, requestStartTime
     .progress-bar-wrapper {
       width: 100%;
       height: 60px;
-      background: transparent;
+      background: #000;
       border-radius: 30px;
       position: relative;
       overflow: hidden;

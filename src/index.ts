@@ -42,25 +42,35 @@ const calculatePercentage = (raised: string, target: string): number => {
 
 // Scrape the Movember page
 async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
+  const startTime = Date.now();
+  console.log(`[SCRAPE] Starting scrape of Movember page: ${MOVEMBER_URL}`);
+  
   const browser = await puppeteer.launch(env.MYBROWSER);
+  console.log(`[SCRAPE] Browser launched successfully`);
   let page;
   
   try {
     page = await browser.newPage();
+    console.log(`[SCRAPE] New page created`);
     
     // Set a reasonable timeout
+    console.log(`[SCRAPE] Navigating to ${MOVEMBER_URL}...`);
     await page.goto(MOVEMBER_URL, {
       waitUntil: "networkidle2",
       timeout: 30000,
     });
+    console.log(`[SCRAPE] Page navigation completed`);
 
     // Wait for the content to load - look for text containing "Raised"
+    console.log(`[SCRAPE] Waiting for "Raised" text to appear...`);
     await page.waitForFunction(
       () => document.body.innerText.includes("Raised"),
       { timeout: 10000 }
     );
+    console.log(`[SCRAPE] "Raised" text found, page content loaded`);
 
     // Extract the data using page.evaluate
+    console.log(`[SCRAPE] Extracting data from page...`);
     const data = await page.evaluate(() => {
       let raised = "";
       let target = "";
@@ -88,6 +98,8 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
       return { raised, target };
     });
 
+    console.log(`[SCRAPE] Raw extracted data:`, { raised: data.raised || "NOT FOUND", target: data.target || "NOT FOUND" });
+
     if (!data.raised) {
       throw new Error("Could not find raised amount on page");
     }
@@ -108,12 +120,26 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
       result.percentage = calculatePercentage(raisedValue, targetValue);
     }
 
+    const duration = Date.now() - startTime;
+    console.log(`[SCRAPE] Scraping completed successfully in ${duration}ms:`, {
+      amount: result.amount,
+      target: result.target,
+      percentage: result.percentage,
+      currency: result.currency,
+    });
+
     return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[SCRAPE] Scraping failed after ${duration}ms:`, errorMessage, error);
+    throw error;
   } finally {
     try {
       await browser.close();
+      console.log(`[SCRAPE] Browser closed`);
     } catch (closeError) {
-      // Ignore close errors
+      console.error(`[SCRAPE] Error closing browser:`, closeError);
     }
   }
 }
@@ -121,16 +147,29 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
 // Retry wrapper with exponential backoff
 async function scrapeWithRetry(env: Env): Promise<ScrapedData> {
   let lastError: Error | null = null;
+  const retryStartTime = Date.now();
+
+  console.log(`[RETRY] Starting retry logic (max ${MAX_RETRIES} attempts)`);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      return await scrapeMovemberPage(env);
+      console.log(`[RETRY] Attempt ${attempt + 1}/${MAX_RETRIES}`);
+      const result = await scrapeMovemberPage(env);
+      const totalDuration = Date.now() - retryStartTime;
+      console.log(`[RETRY] Success on attempt ${attempt + 1} after ${totalDuration}ms`);
+      return result;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = lastError.message;
+      console.error(`[RETRY] Attempt ${attempt + 1} failed:`, errorMessage);
       
       if (attempt < MAX_RETRIES - 1) {
         const delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+        console.log(`[RETRY] Waiting ${delay}ms before retry ${attempt + 2}...`);
         await sleep(delay);
+      } else {
+        const totalDuration = Date.now() - retryStartTime;
+        console.error(`[RETRY] All ${MAX_RETRIES} attempts failed after ${totalDuration}ms`);
       }
     }
   }
@@ -140,15 +179,31 @@ async function scrapeWithRetry(env: Env): Promise<ScrapedData> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const requestStartTime = Date.now();
     const url = new URL(request.url);
     const pathname = url.pathname;
+    const method = request.method;
+
+    console.log(`[REQUEST] ${method} ${pathname} from ${url.origin}`);
 
     try {
       // Check cache first
       const cacheKey = "movember:amount:14810348";
+      console.log(`[CACHE] Checking cache for key: ${cacheKey}`);
       let cached = await env.CACHE.get(cacheKey, { type: "json" });
       let data: ScrapedData | null = cached as ScrapedData | null;
       let cacheStatus = "HIT";
+
+      if (data) {
+        const cacheAge = Date.now() - data.timestamp;
+        console.log(`[CACHE] Cache HIT - data age: ${Math.round(cacheAge / 1000)}s`, {
+          amount: data.amount,
+          target: data.target,
+          timestamp: new Date(data.timestamp).toISOString(),
+        });
+      } else {
+        console.log(`[CACHE] Cache MISS - need to scrape`);
+      }
 
       // If cache miss, scrape the page
       if (!data) {
@@ -156,13 +211,20 @@ export default {
         cacheStatus = "MISS";
         
         // Store in cache with 5-minute TTL
+        console.log(`[CACHE] Storing data in cache with TTL: ${CACHE_TTL}s`);
         await env.CACHE.put(cacheKey, JSON.stringify(data), {
           expirationTtl: CACHE_TTL,
         });
+        console.log(`[CACHE] Data stored successfully`);
       }
 
       // Route handling
       if (pathname === "/json") {
+        const duration = Date.now() - requestStartTime;
+        console.log(`[RESPONSE] JSON response sent in ${duration}ms`, {
+          cache: cacheStatus,
+          amount: data.amount,
+        });
         // Return JSON response
         return new Response(JSON.stringify(data, null, 2), {
           headers: {
@@ -241,6 +303,12 @@ export default {
 </body>
 </html>`;
 
+        const duration = Date.now() - requestStartTime;
+        console.log(`[RESPONSE] HTML response sent in ${duration}ms`, {
+          cache: cacheStatus,
+          amount: data.amount,
+        });
+        
         return new Response(html, {
           headers: {
             "content-type": "text/html; charset=UTF-8",
@@ -249,6 +317,9 @@ export default {
         });
       } else {
         // 404 for other paths
+        const duration = Date.now() - requestStartTime;
+        console.warn(`[RESPONSE] 404 Not Found for path: ${pathname} (${duration}ms)`);
+        
         return new Response("Not Found", {
           status: 404,
           headers: {
@@ -257,7 +328,15 @@ export default {
         });
       }
     } catch (error) {
+      const duration = Date.now() - requestStartTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      console.error(`[ERROR] Request failed after ${duration}ms:`, {
+        pathname,
+        error: errorMessage,
+        stack: errorStack,
+      });
       
       // Return error in appropriate format based on route
       if (pathname === "/json") {
@@ -315,6 +394,8 @@ export default {
   <div class="error">Error loading donation amount</div>
 </body>
 </html>`;
+        
+        console.error(`[ERROR] Returning HTML error page`);
         
         return new Response(errorHtml, {
           status: 500,

@@ -823,11 +823,11 @@ export default {
     .progress-bar-wrapper {
       width: 100%;
       height: 60px;
-      background: #1a1a1a;
+      background: transparent;
       border-radius: 30px;
       position: relative;
       overflow: hidden;
-      border: 2px solid #333;
+      border: 2px solid rgba(255, 255, 255, 0.2);
     }
     .progress-bar-fill {
       height: 100%;

@@ -1,5 +1,5 @@
 {
-  "name": "movember-tracker",
+  "name": "shaggedy-movember",
   "main": "src/index.ts",
   "compatibility_date": "2024-09-15",
   "compatibility_flags": ["nodejs_compat"],

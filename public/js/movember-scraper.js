@@ -59,16 +59,33 @@ async function fetchViaProxy(url) {
 }
 
 // Helper function to detect subdomain from HTML content by checking currency symbols
+// This is used only for verification - the URL subdomain is the primary source of truth
+// Made more conservative: requires currency codes or symbols near amounts, not just anywhere
 function detectSubdomainFromHtml(html) {
   if (!html) return null;
   
-  // Check for currency symbols in HTML to determine subdomain
-  // £ indicates UK (GBP)
-  if (html.includes('£') || html.includes('&pound;') || html.match(/GBP|British Pound/i)) {
+  // Look for currency codes near amounts (more reliable than just symbols anywhere)
+  // Pattern: currency code followed by amount, or amount followed by currency code
+  const currencyCodePatterns = [
+    /\bGBP\b[\s:]*[\d,]+|[\d,]+[\s:]*\bGBP\b|£[\d,]+|British\s+Pound/i,
+    /\bEUR\b[\s:]*[\d,]+|[\d,]+[\s:]*\bEUR\b|€[\d,]+|Euro[\s:]*[\d,]+/i,
+    /\bUSD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bUSD\b|US\s+Dollar/i,
+    /\bAUD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bAUD\b|Australian\s+Dollar/i,
+    /\bCAD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bCAD\b|Canadian\s+Dollar/i,
+    /\bNZD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bNZD\b|New\s+Zealand\s+Dollar/i,
+    /\bZAR\b[\s:]*[\d,]+|[\d,]+[\s:]*\bZAR\b|South\s+African\s+Rand/i,
+    /\bCZK\b[\s:]*[\d,]+|[\d,]+[\s:]*\bCZK\b|Czech\s+Koruna|Kč[\d,]+/i,
+    /\bSEK\b[\s:]*[\d,]+|[\d,]+[\s:]*\bSEK\b|Swedish\s+Krona/i,
+    /\bDKK\b[\s:]*[\d,]+|[\d,]+[\s:]*\bDKK\b|Danish\s+Krone/i,
+  ];
+  
+  // Check for GBP/£ near amounts (UK)
+  if (currencyCodePatterns[0].test(html)) {
     return 'uk';
   }
-  // € indicates EU countries
-  if (html.includes('€') || html.includes('&euro;') || html.match(/EUR|Euro/i)) {
+  
+  // Check for EUR/€ near amounts (EU countries)
+  if (currencyCodePatterns[1].test(html)) {
     // Try to determine which EU country by checking for country-specific text
     if (html.match(/Ireland|Irish/i)) return 'ie';
     if (html.match(/Netherlands|Dutch/i)) return 'nl';
@@ -79,29 +96,57 @@ function detectSubdomainFromHtml(html) {
     // Default to first EU country if we can't determine
     return 'ie';
   }
-  // $ could be USD, AUD, CAD, or NZD - need to check further
-  if (html.includes('$') || html.includes('&dollar;')) {
-    if (html.match(/USD|US Dollar|United States/i)) return 'us';
-    if (html.match(/CAD|Canadian Dollar|Canada/i)) return 'ca';
-    if (html.match(/NZD|New Zealand Dollar|New Zealand/i)) return 'nz';
-    if (html.match(/AUD|Australian Dollar|Australia/i)) return 'au';
-    // Default to AUD if we can't determine
+  
+  // Check for USD near amounts (US)
+  if (currencyCodePatterns[2].test(html)) {
+    return 'us';
+  }
+  
+  // Check for AUD near amounts (Australia) - check before generic $
+  if (currencyCodePatterns[3].test(html)) {
     return 'au';
   }
-  // R for South African Rand
-  if (html.match(/ZAR|South African Rand|South Africa/i)) {
+  
+  // Check for CAD near amounts (Canada)
+  if (currencyCodePatterns[4].test(html)) {
+    return 'ca';
+  }
+  
+  // Check for NZD near amounts (New Zealand)
+  if (currencyCodePatterns[5].test(html)) {
+    return 'nz';
+  }
+  
+  // Check for ZAR near amounts (South Africa)
+  if (currencyCodePatterns[6].test(html)) {
     return 'za';
   }
-  // Kč for Czech Koruna
-  if (html.includes('Kč') || html.match(/CZK|Czech Koruna|Czech Republic|Czech/i)) {
+  
+  // Check for CZK/Kč near amounts (Czech Republic)
+  if (currencyCodePatterns[7].test(html)) {
     return 'cz';
   }
-  // kr for Danish Krone or Swedish Krona - check Swedish first, then Danish
-  if (html.match(/SEK|Swedish Krona|Sweden|Swedish/i)) {
+  
+  // Check for SEK near amounts (Sweden)
+  if (currencyCodePatterns[8].test(html)) {
     return 'se';
   }
-  if (html.includes('kr') || html.match(/DKK|Danish Krone|Denmark|Danish/i)) {
+  
+  // Check for DKK near amounts (Denmark)
+  if (currencyCodePatterns[9].test(html)) {
     return 'dk';
+  }
+  
+  // Fallback: Check for $ near amounts (but this is ambiguous)
+  // Only use if we see $ followed by digits, and prefer AUD as default
+  if (/\$[\d,]+/.test(html)) {
+    // Try to find country indicators
+    if (html.match(/United\s+States|US\s+Dollar/i)) return 'us';
+    if (html.match(/Canada|Canadian/i)) return 'ca';
+    if (html.match(/New\s+Zealand/i)) return 'nz';
+    if (html.match(/Australia|Australian/i)) return 'au';
+    // Default to AUD if we can't determine (since au is default subdomain)
+    return 'au';
   }
   
   return null;
@@ -131,29 +176,38 @@ async function detectSubdomainForMember(memberId, forceRefresh = false) {
   
   // Try to detect by checking common subdomains and their HTML content
   console.log(`[SUBDOMAIN] Detecting subdomain for memberId ${memberId}...`);
-  const commonSubdomains = ['uk', 'au', 'us', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it', 'ex', 'cz', 'dk', 'se'];
+  // Reorder to try 'au' first since it's the default, then other common ones
+  const commonSubdomains = ['au', 'uk', 'us', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it', 'ex', 'cz', 'dk', 'se'];
   
   try {
     // Try common subdomains and check for currency indicators
+    // Primary method: Use the URL subdomain we're testing (most reliable)
+    // Secondary method: Verify with HTML currency check
     for (const subdomain of commonSubdomains) {
       const testSubdomainUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain) + `?memberId=${memberId}`;
       try {
         const testHtml = await fetchViaProxy(testSubdomainUrl);
         if (testHtml && testHtml.length > 1000) {
-          // Check if the HTML matches the expected currency for this subdomain
+          // Primary: Trust the URL subdomain we're testing
+          // Secondary: Use HTML currency check only as verification (more conservative)
           const detectedSubdomain = detectSubdomainFromHtml(testHtml);
+          
+          // If HTML currency check confirms the subdomain, use it immediately
           if (detectedSubdomain === subdomain) {
-            // HTML matches this subdomain's currency - this is likely correct
+            // HTML matches this subdomain's currency - this is correct
             console.log(`[SUBDOMAIN] Found matching subdomain for memberId ${memberId}: ${subdomain} (verified by currency)`);
             setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
             return subdomain;
           } else if (detectedSubdomain && detectedSubdomain !== subdomain) {
-            // HTML indicates a different subdomain - skip this one
+            // HTML indicates a different subdomain - skip this one (likely wrong URL)
+            console.log(`[SUBDOMAIN] HTML currency indicates ${detectedSubdomain} but we tested ${subdomain}, skipping...`);
             continue;
           } else {
-            // Can't determine from currency, but HTML is valid - might be correct
-            // Check if this is the first valid one we found
-            console.log(`[SUBDOMAIN] Found valid HTML for subdomain ${subdomain} (currency check inconclusive)`);
+            // Can't determine from currency, but HTML is valid - trust the URL subdomain
+            // This is the primary method: if the URL works, use that subdomain
+            console.log(`[SUBDOMAIN] Found valid HTML for subdomain ${subdomain} (currency check inconclusive, trusting URL)`);
+            setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
+            return subdomain;
           }
         }
       } catch (e) {
@@ -243,13 +297,14 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
     const fetchDuration = Date.now() - fetchStart;
     console.log(`[SCRAPE] HTML fetched successfully in ${formatDuration(fetchDuration)} (${html.length} characters)`);
 
-    // Verify subdomain by checking HTML content for currency indicators
+    // Verify subdomain by checking HTML content for currency indicators (optional verification only)
+    // The URL subdomain is the primary source of truth - HTML check is just for validation
     const htmlDetectedSubdomain = detectSubdomainFromHtml(html);
     if (htmlDetectedSubdomain && htmlDetectedSubdomain !== subdomain) {
-      console.log(`[SCRAPE] HTML indicates subdomain ${htmlDetectedSubdomain} but we're using ${subdomain}. Updating subdomain...`);
-      subdomain = htmlDetectedSubdomain;
-      // Update cache with correct subdomain
-      setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
+      console.warn(`[SCRAPE] HTML currency indicates subdomain ${htmlDetectedSubdomain} but URL subdomain is ${subdomain}. Trusting URL subdomain (primary source).`);
+      // Don't override - trust the URL subdomain we're using
+    } else if (htmlDetectedSubdomain === subdomain) {
+      console.log(`[SCRAPE] HTML currency verification confirms subdomain ${subdomain}`);
     }
 
     // Extract data from HTML using regex
@@ -631,6 +686,7 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
     let result = {
       amount: raisedFormatted,
       currency,
+      subdomain, // Include subdomain in result for consolidated cache
       timestamp: Date.now(),
     };
 
@@ -650,6 +706,7 @@ export async function scrapeMovemberPage(memberId, clearSubdomainOn404 = false) 
       target: result.target,
       percentage: result.percentage,
       currency: result.currency,
+      subdomain: result.subdomain,
     });
 
     return result;
@@ -704,7 +761,6 @@ export async function scrapeWithRetry(memberId) {
 
 // Main function to get data (with caching)
 export async function getData(memberId, grabLive = false) {
-  const cacheKey = `movember:amount:${memberId}`;
   let data = null;
   let cacheStatus = "HIT";
 
@@ -720,7 +776,7 @@ export async function getData(memberId, grabLive = false) {
     console.log(`[CACHE] Live data stored successfully`);
   } else {
     // Check cache first
-    console.log(`[CACHE] Checking cache for key: ${cacheKey}`);
+    console.log(`[CACHE] Checking cache for memberId: ${memberId}`);
     data = getCachedData(memberId);
 
     if (data) {

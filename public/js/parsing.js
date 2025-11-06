@@ -1,60 +1,23 @@
 import { getCurrencyFromSubdomain } from './constants.js';
 
 // Helper function to extract amount from text
+// Currency is ALWAYS determined from subdomain, never from HTML/text parsing
 // @param {string} text - The text containing the amount
-// @param {string} [subdomain] - Optional subdomain (e.g., "uk", "au", "us") to determine currency
-export const parseAmount = (text, subdomain = null) => {
-  // Remove whitespace and extract currency symbol and amount
+// @param {string} subdomain - Required subdomain (e.g., "uk", "au", "us") to determine currency
+export const parseAmount = (text, subdomain) => {
+  // Remove whitespace and extract amount
   const cleaned = text.trim();
   
-  // Try to match currency codes first (USD, EUR, GBP, AUD, etc.) - highest priority
-  const currencyCodeMatch = cleaned.match(/\b(USD|EUR|GBP|AUD|JPY|CAD|NZD|ZAR)\b/i);
-  if (currencyCodeMatch) {
-    const currency = currencyCodeMatch[1].toUpperCase();
-    // Extract amount after currency code
-    const amountMatch = cleaned.replace(currencyCodeMatch[0], '').match(/[\d,]+\.?\d*/);
-    const amount = amountMatch ? amountMatch[0] : "0";
-    return { value: amount, currency };
-  }
-  
-  // If subdomain is provided, use it to determine currency (medium priority)
-  let currency = null;
-  if (subdomain) {
-    currency = getCurrencyFromSubdomain(subdomain);
-  }
-  
-  // Try to match currency symbols ($, €, £, ¥) - lower priority
-  const currencySymbolMatch = cleaned.match(/^([$€£¥])/);
-  if (currencySymbolMatch) {
-    const symbol = currencySymbolMatch[1];
-    // Use symbol-based currency if subdomain didn't provide one, or if symbol is unambiguous
-    if (!currency) {
-      if (symbol === "$") {
-        // "$" is ambiguous - use subdomain if available, otherwise default to AUD
-        currency = subdomain ? getCurrencyFromSubdomain(subdomain) : "AUD";
-      } else if (symbol === "€") currency = "EUR";
-      else if (symbol === "£") currency = "GBP";
-      else if (symbol === "¥") currency = "JPY";
-    } else if (symbol === "$") {
-      // If we have subdomain-based currency and see "$", trust the subdomain
-      // (e.g., US uses $ but subdomain tells us it's USD, not AUD)
-      // Keep the subdomain-based currency
-    } else {
-      // For unambiguous symbols (€, £, ¥), they override subdomain
-      if (symbol === "€") currency = "EUR";
-      else if (symbol === "£") currency = "GBP";
-      else if (symbol === "¥") currency = "JPY";
-    }
-  }
-  
-  // Default to AUD if no currency determined yet
-  if (!currency) {
-    currency = "AUD";
-  }
+  // Always use subdomain to determine currency - this is the source of truth
+  // If subdomain is not provided, default to AUD
+  const currency = subdomain ? getCurrencyFromSubdomain(subdomain) : "AUD";
   
   // Extract amount (supports numbers with commas and optional decimals)
-  const amountMatch = cleaned.match(/[\d,]+\.?\d*/);
+  // Remove currency symbols and codes before extracting number
+  const cleanedForAmount = cleaned.replace(/[$€£¥]|\b(USD|EUR|GBP|AUD|JPY|CAD|NZD|ZAR)\b/gi, '').trim();
+  const amountMatch = cleanedForAmount.match(/[\d,]+\.?\d*/);
   const amount = amountMatch ? amountMatch[0] : "0";
+  
   return { value: amount, currency };
 };
 

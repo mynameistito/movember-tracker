@@ -81,6 +81,28 @@ You can track any Movember member by adding the `memberId` query parameter to yo
 
 Each member ID has its own cache, so different members' data won't interfere with each other.
 
+### Subdomain Support
+
+Different Movember members may use different subdomains (e.g., `fr.movember.com`, `au.movember.com`, etc.). **The Worker automatically detects the correct subdomain by following redirects** - no manual configuration needed!
+
+**How it works:**
+1. When a member ID is first requested, the Worker tries the default subdomain (`au.movember.com`)
+2. If Movember redirects to a different subdomain, the Worker detects and caches it
+3. The detected subdomain is cached for 24 hours to avoid repeated detection
+4. Subsequent requests use the cached subdomain for faster performance
+
+**Manual overrides (optional):**
+If you need to manually override a subdomain mapping, you can edit `src/index.ts` and add entries to the `MEMBER_SUBDOMAIN_MAP`:
+
+```typescript
+const MEMBER_SUBDOMAIN_MAP: Record<string, string> = {
+  "15023456": "fr",  // Manual override for member 15023456
+  // Add more overrides if needed
+};
+```
+
+Manual overrides take precedence over auto-detection and are also cached.
+
 ### JSON Response Format
 
 ```json

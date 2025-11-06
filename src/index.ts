@@ -10,11 +10,123 @@ interface ScrapedData {
   timestamp: number;
 }
 
-const MOVEMBER_BASE_URL = "https://au.movember.com/donate/details";
+// Mapping of member IDs to their subdomains (manual overrides)
+// Format: "memberId": "subdomain"
+// Example: "15023456": "fr" means member 15023456 uses fr.movember.com
+// Note: Subdomains are now auto-detected from redirects, but you can override here if needed
+const MEMBER_SUBDOMAIN_MAP: Record<string, string> = {
+  // Add manual overrides here if needed
+  // Example: "15023456": "fr",
+  // Example: "14810348": "au",
+};
+
+const DEFAULT_SUBDOMAIN = "au"; // Default subdomain to try first
+const MOVEMBER_BASE_URL_TEMPLATE = "https://{subdomain}.movember.com/donate/details";
 const DEFAULT_MEMBER_ID = "14810348"; // Default member ID if none provided
 const CACHE_TTL = 300; // 5 minutes in seconds
+const SUBDOMAIN_CACHE_TTL = 86400; // 24 hours in seconds (subdomain mappings don't change often)
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff in milliseconds
+
+// Helper function to extract subdomain from URL
+function extractSubdomainFromUrl(url: string): string | null {
+  const match = url.match(/https?:\/\/([^.]+)\.movember\.com/);
+  return match ? match[1] : null;
+}
+
+// Helper function to detect subdomain by following redirects
+async function detectSubdomainForMember(env: Env, memberId: string): Promise<string> {
+  const cacheKey = `movember:subdomain:${memberId}`;
+  
+  // Check cache first
+  const cached = await env.CACHE.get(cacheKey);
+  if (cached) {
+    console.log(`[SUBDOMAIN] Found cached subdomain for memberId ${memberId}: ${cached}`);
+    return cached;
+  }
+  
+  // Check manual override
+  if (MEMBER_SUBDOMAIN_MAP[memberId]) {
+    const subdomain = MEMBER_SUBDOMAIN_MAP[memberId];
+    console.log(`[SUBDOMAIN] Using manual override for memberId ${memberId}: ${subdomain}`);
+    // Cache the manual override
+    await env.CACHE.put(cacheKey, subdomain, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+    return subdomain;
+  }
+  
+  // Try to detect by following redirects
+  console.log(`[SUBDOMAIN] Detecting subdomain for memberId ${memberId}...`);
+  const testUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", DEFAULT_SUBDOMAIN) + `?memberId=${memberId}`;
+  
+  const fetchOptions = {
+    redirect: 'follow' as RequestRedirect, // Follow redirects automatically
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  };
+  
+  try {
+    // First try a HEAD request (lighter weight)
+    let response = await fetch(testUrl, {
+      ...fetchOptions,
+      method: 'HEAD',
+    });
+    
+    // Get the final URL after redirects
+    let finalUrl = response.url;
+    let detectedSubdomain = extractSubdomainFromUrl(finalUrl);
+    
+    // If HEAD didn't work or didn't redirect, try GET
+    if (!detectedSubdomain || finalUrl === testUrl) {
+      console.log(`[SUBDOMAIN] HEAD request didn't reveal redirect, trying GET...`);
+      response = await fetch(testUrl, {
+        ...fetchOptions,
+        method: 'GET',
+      });
+      finalUrl = response.url;
+      detectedSubdomain = extractSubdomainFromUrl(finalUrl);
+    }
+    
+    if (detectedSubdomain && detectedSubdomain !== DEFAULT_SUBDOMAIN) {
+      console.log(`[SUBDOMAIN] Detected subdomain for memberId ${memberId}: ${detectedSubdomain} (from ${finalUrl})`);
+      // Cache the detected subdomain
+      await env.CACHE.put(cacheKey, detectedSubdomain, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+      return detectedSubdomain;
+    } else if (detectedSubdomain) {
+      // Same subdomain, no redirect needed
+      console.log(`[SUBDOMAIN] No redirect detected for memberId ${memberId}, using default: ${DEFAULT_SUBDOMAIN}`);
+      await env.CACHE.put(cacheKey, DEFAULT_SUBDOMAIN, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+      return DEFAULT_SUBDOMAIN;
+    }
+  } catch (error) {
+    console.warn(`[SUBDOMAIN] Failed to detect subdomain for memberId ${memberId}, using default:`, error);
+  }
+  
+  // Fallback to default
+  console.log(`[SUBDOMAIN] Using default subdomain for memberId ${memberId}: ${DEFAULT_SUBDOMAIN}`);
+  await env.CACHE.put(cacheKey, DEFAULT_SUBDOMAIN, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+  return DEFAULT_SUBDOMAIN;
+}
+
+// Helper function to get subdomain for a member ID (with auto-detection)
+async function getSubdomainForMember(env: Env, memberId: string): Promise<string> {
+  // Check manual override first
+  if (MEMBER_SUBDOMAIN_MAP[memberId]) {
+    return MEMBER_SUBDOMAIN_MAP[memberId];
+  }
+  
+  // Auto-detect (will check cache internally)
+  return await detectSubdomainForMember(env, memberId);
+}
+
+// Helper function to build Movember URL with correct subdomain
+async function buildMovemberUrl(env: Env, memberId: string): Promise<string> {
+  const subdomain = await getSubdomainForMember(env, memberId);
+  const baseUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain);
+  return `${baseUrl}?memberId=${memberId}`;
+}
 
 // Helper function to sleep
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,9 +164,10 @@ const formatDuration = (ms: number): string => {
 
 // Scrape the Movember page using fetch and HTML parsing
 async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedData> {
-  const movemberUrl = `${MOVEMBER_BASE_URL}?memberId=${memberId}`;
+  const movemberUrl = await buildMovemberUrl(env, memberId);
+  const subdomain = await getSubdomainForMember(env, memberId);
   const startTime = Date.now();
-  console.log(`[SCRAPE] Starting scrape of Movember page: ${movemberUrl}`);
+  console.log(`[SCRAPE] Starting scrape of Movember page: ${movemberUrl} (subdomain: ${subdomain})`);
   
   try {
     // Fetch the HTML directly

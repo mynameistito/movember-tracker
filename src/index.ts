@@ -40,37 +40,58 @@ const calculatePercentage = (raised: string, target: string): number => {
   return Math.round((raisedNum / targetNum) * 100);
 };
 
+// Helper function to format duration in human-readable format
+const formatDuration = (ms: number): string => {
+  const seconds = Math.round(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s (${ms}ms)`;
+  }
+  return `${seconds}s (${ms}ms)`;
+};
+
 // Scrape the Movember page
 async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
   const startTime = Date.now();
   console.log(`[SCRAPE] Starting scrape of Movember page: ${MOVEMBER_URL}`);
   
+  const browserLaunchStart = Date.now();
   const browser = await puppeteer.launch(env.MYBROWSER);
-  console.log(`[SCRAPE] Browser launched successfully`);
+  const browserLaunchDuration = Date.now() - browserLaunchStart;
+  console.log(`[BROWSER] Browser launched successfully in ${formatDuration(browserLaunchDuration)}`);
   let page;
   
   try {
+    const pageCreateStart = Date.now();
     page = await browser.newPage();
-    console.log(`[SCRAPE] New page created`);
+    const pageCreateDuration = Date.now() - pageCreateStart;
+    console.log(`[BROWSER] New page created in ${formatDuration(pageCreateDuration)}`);
     
     // Set a reasonable timeout
     console.log(`[SCRAPE] Navigating to ${MOVEMBER_URL}...`);
+    const navigationStart = Date.now();
     await page.goto(MOVEMBER_URL, {
       waitUntil: "networkidle2",
       timeout: 30000,
     });
-    console.log(`[SCRAPE] Page navigation completed`);
+    const navigationDuration = Date.now() - navigationStart;
+    console.log(`[BROWSER] Page navigation completed in ${formatDuration(navigationDuration)}`);
 
     // Wait for the content to load - look for text containing "Raised"
     console.log(`[SCRAPE] Waiting for "Raised" text to appear...`);
+    const waitStart = Date.now();
     await page.waitForFunction(
       () => document.body.innerText.includes("Raised"),
       { timeout: 10000 }
     );
-    console.log(`[SCRAPE] "Raised" text found, page content loaded`);
+    const waitDuration = Date.now() - waitStart;
+    console.log(`[BROWSER] "Raised" text found in ${formatDuration(waitDuration)}`);
 
     // Extract the data using page.evaluate
     console.log(`[SCRAPE] Extracting data from page...`);
+    const evaluateStart = Date.now();
     const data = await page.evaluate(() => {
       let raised = "";
       let target = "";
@@ -97,6 +118,8 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
       
       return { raised, target };
     });
+    const evaluateDuration = Date.now() - evaluateStart;
+    console.log(`[BROWSER] Data extraction completed in ${formatDuration(evaluateDuration)}`);
 
     console.log(`[SCRAPE] Raw extracted data:`, { raised: data.raised || "NOT FOUND", target: data.target || "NOT FOUND" });
 
@@ -120,8 +143,20 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
       result.percentage = calculatePercentage(raisedValue, targetValue);
     }
 
-    const duration = Date.now() - startTime;
-    console.log(`[SCRAPE] Scraping completed successfully in ${duration}ms:`, {
+    const totalDuration = Date.now() - startTime;
+    const totalSeconds = Math.round(totalDuration / 1000);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    
+    // Warn if approaching 10-minute limit (9 minutes = 540 seconds)
+    if (totalSeconds >= 540) {
+      console.warn(`[BROWSER] ⚠️ WARNING: Browser rendering time is ${totalMinutes}m ${remainingSeconds}s - approaching 10-minute free limit!`);
+    } else if (totalSeconds >= 480) {
+      console.warn(`[BROWSER] ⚠️ CAUTION: Browser rendering time is ${totalMinutes}m ${remainingSeconds}s - getting close to 10-minute limit`);
+    }
+    
+    console.log(`[BROWSER] Total browser rendering time: ${formatDuration(totalDuration)}`);
+    console.log(`[SCRAPE] Scraping completed successfully in ${formatDuration(totalDuration)}:`, {
       amount: result.amount,
       target: result.target,
       percentage: result.percentage,
@@ -130,14 +165,17 @@ async function scrapeMovemberPage(env: Env): Promise<ScrapedData> {
 
     return result;
   } catch (error) {
-    const duration = Date.now() - startTime;
+    const totalDuration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[SCRAPE] Scraping failed after ${duration}ms:`, errorMessage, error);
+    console.error(`[BROWSER] Total browser rendering time before error: ${formatDuration(totalDuration)}`);
+    console.error(`[SCRAPE] Scraping failed after ${formatDuration(totalDuration)}:`, errorMessage, error);
     throw error;
   } finally {
     try {
+      const closeStart = Date.now();
       await browser.close();
-      console.log(`[SCRAPE] Browser closed`);
+      const closeDuration = Date.now() - closeStart;
+      console.log(`[BROWSER] Browser closed in ${formatDuration(closeDuration)}`);
     } catch (closeError) {
       console.error(`[SCRAPE] Error closing browser:`, closeError);
     }

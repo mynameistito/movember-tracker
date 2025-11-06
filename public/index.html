@@ -11,6 +11,10 @@
 <!-- Primary Meta Tags -->
 <meta name="title" content="Movember Donation Tracker" />
 <meta name="description" content="Track Movember donations in real-time. Automatically fetches and caches data from Movember pages—ideal for stream overlays, websites, and apps." />
+<meta name="keywords" content="Movember, donation tracker, fundraising, API, stream overlay, real-time donations, Movember API, donation progress" />
+<meta name="author" content="My Name is Tito" />
+<meta name="robots" content="index, follow" />
+<meta name="theme-color" content="#10b981" />
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content="website" />
@@ -18,6 +22,11 @@
 <meta property="og:title" content="Movember Donation Tracker" />
 <meta property="og:description" content="Track Movember donations in real-time. Automatically fetches and caches data from Movember pages—ideal for stream overlays, websites, and apps." />
 <meta property="og:image" content="https://movember-tracker.mynameistito.workers.dev/opengraph.png?v=2" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Movember Donation Tracker - Track your Movember fundraising progress in real-time" />
+<meta property="og:site_name" content="Movember Donation Tracker" />
+<meta property="og:locale" content="en_US" />
 
 <!-- X (Twitter) -->
 <meta property="twitter:card" content="summary_large_image" />
@@ -25,9 +34,65 @@
 <meta property="twitter:title" content="Movember Donation Tracker" />
 <meta property="twitter:description" content="Track Movember donations in real-time. Automatically fetches and caches data from Movember pages—ideal for stream overlays, websites, and apps." />
 <meta property="twitter:image" content="https://movember-tracker.mynameistito.workers.dev/opengraph.png?v=2" />
+<meta property="twitter:image:alt" content="Movember Donation Tracker - Track your Movember fundraising progress in real-time" />
+<meta name="twitter:site" content="@mynameistito" />
+<meta name="twitter:creator" content="@mynameistito" />
 
+<!-- LinkedIn -->
+<!-- LinkedIn uses Open Graph tags (already included above) -->
+
+<!-- Pinterest -->
+<!-- Pinterest uses Open Graph tags (already included above) -->
+
+<!-- Mobile / PWA Meta Tags -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Movember Tracker" />
+<meta name="mobile-web-app-capable" content="yes" />
+
+<!-- Link Tags -->
+<link rel="canonical" href="https://movember-tracker.mynameistito.workers.dev/" />
+<link rel="manifest" href="/manifest.json" />
 <link rel="icon" href="https://movember-tracker.mynameistito.workers.dev/favicon.webp">
+<link rel="apple-touch-icon" sizes="180x180" href="https://movember-tracker.mynameistito.workers.dev/favicon.webp">
+<link rel="apple-touch-icon" sizes="152x152" href="https://movember-tracker.mynameistito.workers.dev/favicon.webp">
+<link rel="apple-touch-icon" sizes="120x120" href="https://movember-tracker.mynameistito.workers.dev/favicon.webp">
 <link rel="apple-touch-icon" href="https://movember-tracker.mynameistito.workers.dev/favicon.webp">
+
+<!-- Structured Data (JSON-LD) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Movember Donation Tracker",
+  "description": "Track Movember donations in real-time. Automatically fetches and caches data from Movember pages—ideal for stream overlays, websites, and apps.",
+  "url": "https://movember-tracker.mynameistito.workers.dev/",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": {
+      "@type": "EntryPoint",
+      "urlTemplate": "https://movember-tracker.mynameistito.workers.dev/?memberId={search_term_string}"
+    },
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Movember Donation Tracker",
+  "description": "Track Movember donations in real-time. Automatically fetches and caches data from Movember pages—ideal for stream overlays, websites, and apps.",
+  "url": "https://movember-tracker.mynameistito.workers.dev/",
+  "applicationCategory": "UtilityApplication",
+  "operatingSystem": "Web",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
 
 </head>
 <body class="bg-gradient-to-br from-slate-900 to-slate-800 text-gray-200 leading-relaxed pb-[60px] md:pb-20 min-h-screen font-['Inter',system-ui,sans-serif]">

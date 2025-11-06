@@ -34,15 +34,26 @@ function extractSubdomainFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
+// Helper function to clear cached subdomain for a member
+async function clearSubdomainCache(env: Env, memberId: string): Promise<void> {
+  const cacheKey = `movember:subdomain:${memberId}`;
+  await env.CACHE.delete(cacheKey);
+  console.log(`[SUBDOMAIN] Cleared cached subdomain for memberId ${memberId}`);
+}
+
 // Helper function to detect subdomain by following redirects
-async function detectSubdomainForMember(env: Env, memberId: string): Promise<string> {
+async function detectSubdomainForMember(env: Env, memberId: string, forceRefresh: boolean = false): Promise<string> {
   const cacheKey = `movember:subdomain:${memberId}`;
   
-  // Check cache first
-  const cached = await env.CACHE.get(cacheKey);
-  if (cached) {
-    console.log(`[SUBDOMAIN] Found cached subdomain for memberId ${memberId}: ${cached}`);
-    return cached;
+  // Check cache first (unless forcing refresh)
+  if (!forceRefresh) {
+    const cached = await env.CACHE.get(cacheKey);
+    if (cached) {
+      console.log(`[SUBDOMAIN] Found cached subdomain for memberId ${memberId}: ${cached}`);
+      return cached;
+    }
+  } else {
+    console.log(`[SUBDOMAIN] Force refresh requested, skipping cache for memberId ${memberId}`);
   }
   
   // Check manual override
@@ -74,6 +85,33 @@ async function detectSubdomainForMember(env: Env, memberId: string): Promise<str
       method: 'HEAD',
     });
     
+    // If we get a 404, the member might not exist or the subdomain is wrong
+    if (response.status === 404) {
+      console.warn(`[SUBDOMAIN] Got 404 for ${testUrl}, member may not exist or subdomain may be wrong`);
+      // Try a few common subdomains
+      const commonSubdomains = ['us', 'uk', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it'];
+      for (const subdomain of commonSubdomains) {
+        const testSubdomainUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain) + `?memberId=${memberId}`;
+        try {
+          const testResponse = await fetch(testSubdomainUrl, {
+            ...fetchOptions,
+            method: 'HEAD',
+          });
+          if (testResponse.ok || testResponse.status !== 404) {
+            console.log(`[SUBDOMAIN] Found working subdomain for memberId ${memberId}: ${subdomain}`);
+            await env.CACHE.put(cacheKey, subdomain, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+            return subdomain;
+          }
+        } catch (e) {
+          // Continue to next subdomain
+        }
+      }
+      // If all subdomains fail, still cache the default to avoid repeated lookups
+      console.warn(`[SUBDOMAIN] Could not find working subdomain for memberId ${memberId}, using default: ${DEFAULT_SUBDOMAIN}`);
+      await env.CACHE.put(cacheKey, DEFAULT_SUBDOMAIN, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+      return DEFAULT_SUBDOMAIN;
+    }
+    
     // Get the final URL after redirects
     let finalUrl = response.url;
     let detectedSubdomain = extractSubdomainFromUrl(finalUrl);
@@ -85,6 +123,33 @@ async function detectSubdomainForMember(env: Env, memberId: string): Promise<str
         ...fetchOptions,
         method: 'GET',
       });
+      
+      // Check for 404 again
+      if (response.status === 404) {
+        console.warn(`[SUBDOMAIN] Got 404 for ${testUrl} with GET request`);
+        // Try common subdomains as above
+        const commonSubdomains = ['us', 'uk', 'ca', 'nz', 'ie', 'za', 'nl', 'de', 'fr', 'es', 'it'];
+        for (const subdomain of commonSubdomains) {
+          const testSubdomainUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain) + `?memberId=${memberId}`;
+          try {
+            const testResponse = await fetch(testSubdomainUrl, {
+              ...fetchOptions,
+              method: 'GET',
+            });
+            if (testResponse.ok || testResponse.status !== 404) {
+              console.log(`[SUBDOMAIN] Found working subdomain for memberId ${memberId}: ${subdomain}`);
+              await env.CACHE.put(cacheKey, subdomain, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+              return subdomain;
+            }
+          } catch (e) {
+            // Continue to next subdomain
+          }
+        }
+        console.warn(`[SUBDOMAIN] Could not find working subdomain for memberId ${memberId}, using default: ${DEFAULT_SUBDOMAIN}`);
+        await env.CACHE.put(cacheKey, DEFAULT_SUBDOMAIN, { expirationTtl: SUBDOMAIN_CACHE_TTL });
+        return DEFAULT_SUBDOMAIN;
+      }
+      
       finalUrl = response.url;
       detectedSubdomain = extractSubdomainFromUrl(finalUrl);
     }
@@ -206,9 +271,9 @@ const formatDuration = (ms: number): string => {
 };
 
 // Scrape the Movember page using fetch and HTML parsing
-async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedData> {
+async function scrapeMovemberPage(env: Env, memberId: string, clearSubdomainOn404: boolean = false): Promise<ScrapedData> {
   const movemberUrl = await buildMovemberUrl(env, memberId);
-  const subdomain = await getSubdomainForMember(env, memberId);
+  let subdomain = await getSubdomainForMember(env, memberId);
   const startTime = Date.now();
   console.log(`[SCRAPE] Starting scrape of Movember page: ${movemberUrl} (subdomain: ${subdomain})`);
   
@@ -216,13 +281,45 @@ async function scrapeMovemberPage(env: Env, memberId: string): Promise<ScrapedDa
     // Fetch the HTML directly
     console.log(`[SCRAPE] Fetching HTML from ${movemberUrl}...`);
     const fetchStart = Date.now();
-    const response = await fetch(movemberUrl, {
+    let response = await fetch(movemberUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
     });
+    
+    // Handle 404 errors specially - clear cached subdomain and re-detect
+    if (response.status === 404) {
+      console.warn(`[SCRAPE] Got 404 for ${movemberUrl}, clearing cached subdomain and re-detecting...`);
+      if (clearSubdomainOn404) {
+        await clearSubdomainCache(env, memberId);
+        // Re-detect subdomain with force refresh
+        const newSubdomain = await detectSubdomainForMember(env, memberId, true);
+        if (newSubdomain !== subdomain) {
+          console.log(`[SCRAPE] Re-detected subdomain: ${newSubdomain} (was ${subdomain}), retrying with new subdomain...`);
+          // Retry with new subdomain
+          const newUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", newSubdomain) + `?memberId=${memberId}`;
+          response = await fetch(newUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status} (after subdomain re-detection)`);
+          }
+          // Update subdomain for logging
+          subdomain = newSubdomain;
+        } else {
+          // Same subdomain, still 404 - member probably doesn't exist
+          throw new Error(`HTTP error! status: 404 (page not found - member may not exist)`);
+        }
+      } else {
+        throw new Error(`HTTP error! status: ${response.status} (page not found - member may not exist or subdomain may be incorrect)`);
+      }
+    }
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -647,7 +744,9 @@ async function scrapeWithRetry(env: Env, memberId: string): Promise<ScrapedData>
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       console.log(`[RETRY] Attempt ${attempt + 1}/${MAX_RETRIES}`);
-      const result = await scrapeMovemberPage(env, memberId);
+      // Enable subdomain clearing on 404 for retries (especially on first attempt)
+      const clearSubdomainOn404 = attempt === 0 || (lastError !== null && lastError.message.includes('404'));
+      const result = await scrapeMovemberPage(env, memberId, clearSubdomainOn404);
       const totalDuration = Date.now() - retryStartTime;
       console.log(`[RETRY] Success on attempt ${attempt + 1} after ${totalDuration}ms`);
       return result;
@@ -655,6 +754,12 @@ async function scrapeWithRetry(env: Env, memberId: string): Promise<ScrapedData>
       lastError = error instanceof Error ? error : new Error(String(error));
       const errorMessage = lastError.message;
       console.error(`[RETRY] Attempt ${attempt + 1} failed:`, errorMessage);
+      
+      // If we got a 404, clear the subdomain cache before retrying
+      if (errorMessage.includes('404')) {
+        console.log(`[RETRY] 404 detected, clearing subdomain cache for memberId: ${memberId}`);
+        await clearSubdomainCache(env, memberId);
+      }
       
       if (attempt < MAX_RETRIES - 1) {
         const delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];

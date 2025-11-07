@@ -191,13 +191,13 @@
   </div>
 
   <script type="module">
-    import { getData } from './js/movember-scraper.js';
     import { DEFAULT_MEMBER_ID } from './js/constants.js';
+    import { getData } from './js/movember-scraper.js';
 
     // Set base URLs
     const baseUrl = window.location.origin;
-    document.getElementById('baseUrl').textContent = baseUrl + '/json';
-    document.getElementById('overlayUrl').textContent = baseUrl + '/overlay';
+    document.getElementById('baseUrl').textContent = `${baseUrl}/json`;
+    document.getElementById('overlayUrl').textContent = `${baseUrl}/overlay`;
 
     // Get memberId from URL or use default
     function getMemberId() {
@@ -208,7 +208,7 @@
     }
 
     // Copy overlay URL to clipboard
-    window.copyOverlayUrl = async function() {
+    window.copyOverlayUrl = async () => {
       const memberId = getMemberId();
       const overlayUrl = `${baseUrl}/overlay?memberId=${memberId}`;
       const copyButton = document.getElementById('copyOverlayButton');
@@ -223,6 +223,7 @@
         }, 2000);
       } catch (error) {
         // Fallback for older browsers or if clipboard API fails
+        console.warn('Clipboard API failed:', error);
         try {
           // Create a temporary textarea element
           const textarea = document.createElement('textarea');
@@ -244,7 +245,8 @@
           const displayDiv = document.getElementById('dataDisplay');
           displayDiv.innerHTML = `
             <div class="text-red-500 bg-red-500/10 border-l-4 border-red-500 p-3 my-4 rounded">
-              <strong>Error:</strong> Failed to copy URL to clipboard. URL: ${overlayUrl}
+              <strong>Error:</strong> Failed to copy URL to clipboard. URL: ${overlayUrl}<br>
+              ${fallbackError.message || fallbackError}
             </div>
           `;
         }
@@ -268,18 +270,18 @@
       if (targetElement && data.target) {
         targetElement.classList.add('opacity-70');
         setTimeout(() => {
-          targetElement.innerHTML = '<span class="text-lg md:text-xl font-normal mr-2">Target:</span>' + (data.target || '$0');
+          targetElement.innerHTML = `<span class="text-lg md:text-xl font-normal mr-2">Target:</span>${data.target || '$0'}`;
           targetElement.classList.remove('opacity-70');
         }, 150);
       }
       
       if (progressBar && data.percentage !== undefined) {
-        progressBar.style.width = Math.min(data.percentage || 0, 100) + '%';
+        progressBar.style.width = `${Math.min(data.percentage || 0, 100)}%`;
       }
     }
 
     // Fetch and display data
-    window.fetchData = async function(forceRefresh = false) {
+    window.fetchData = async (forceRefresh = false) => {
       const memberId = getMemberId();
       const displayDiv = document.getElementById('dataDisplay');
       const fetchButton = document.getElementById('fetchButton');

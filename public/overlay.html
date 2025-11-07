@@ -22,8 +22,8 @@
     </div>
   </div>
   <script type="module">
-    import { getData } from './js/movember-scraper.js';
     import { DEFAULT_MEMBER_ID } from './js/constants.js';
+    import { getData } from './js/movember-scraper.js';
 
     const amountElement = document.getElementById('amount');
     const targetElement = document.getElementById('target');
@@ -48,9 +48,9 @@
           
           setTimeout(() => {
             amountElement.textContent = data.amount || '$0';
-            targetElement.innerHTML = '<span class="text-lg md:text-xl font-normal mr-2">Target:</span>' + (data.target || '$0');
+            targetElement.innerHTML = `<span class="text-lg md:text-xl font-normal mr-2">Target:</span>${data.target || '$0'}`;
             const percentage = data.percentage || 0;
-            progressBar.style.width = Math.min(percentage, 100) + '%';
+            progressBar.style.width = `${Math.min(percentage, 100)}%`;
             currentData = {
               amount: data.amount || '$0',
               target: data.target || '$0',

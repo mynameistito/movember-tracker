@@ -38,8 +38,15 @@ export const SUBDOMAIN_CURRENCY_MAP = {
 	se: "SEK", // Sweden - Swedish Krona
 };
 
-// Helper function to get currency code from subdomain
-// Returns the currency code for the given subdomain, or defaults to AUD
+/**
+ * Get currency code from subdomain
+ * @param {string} subdomain - The subdomain code (e.g., "uk", "au", "us")
+ * @returns {string} The currency code (e.g., "GBP", "AUD", "USD"), defaults to "AUD" if not found
+ * @example
+ * getCurrencyFromSubdomain("uk") // "GBP"
+ * getCurrencyFromSubdomain("au") // "AUD"
+ * getCurrencyFromSubdomain("us") // "USD"
+ */
 export function getCurrencyFromSubdomain(subdomain) {
 	if (!subdomain) {
 		return "AUD"; // Default currency
@@ -62,8 +69,15 @@ const CURRENCY_SYMBOL_MAP = {
 	SEK: "kr", // Swedish Krona
 };
 
-// Helper function to get currency symbol from currency code
-// Returns the currency symbol for the given currency code, or defaults to "$"
+/**
+ * Get currency symbol from currency code
+ * @param {string} currencyCode - The currency code (e.g., "USD", "GBP", "EUR")
+ * @returns {string} The currency symbol (e.g., "$", "£", "€"), defaults to "$" if not found
+ * @example
+ * getCurrencySymbol("USD") // "$"
+ * getCurrencySymbol("GBP") // "£"
+ * getCurrencySymbol("EUR") // "€"
+ */
 export function getCurrencySymbol(currencyCode) {
 	if (!currencyCode) {
 		return "$"; // Default symbol
@@ -71,8 +85,13 @@ export function getCurrencySymbol(currencyCode) {
 	return CURRENCY_SYMBOL_MAP[currencyCode.toUpperCase()] || "$";
 }
 
-// Use the Worker's own proxy endpoint instead of external service
-// This will be set dynamically based on the current origin
+/**
+ * Get the Worker's proxy URL
+ * Uses the current origin (the Worker's domain) for the proxy endpoint
+ * @returns {string} The proxy URL (e.g., "https://example.com/proxy")
+ * @example
+ * getProxyUrl() // "https://movember-tracker.example.com/proxy"
+ */
 export function getProxyUrl() {
 	// Use the current origin (the Worker's domain) for the proxy
 	return `${window.location.origin}/proxy`;

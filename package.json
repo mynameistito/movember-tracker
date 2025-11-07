@@ -10,7 +10,9 @@
 		"tail": "bunx wrangler tail --format json",
 		"check": "bunx @biomejs/biome check --write .",
 		"format": "bunx @biomejs/biome format --write .",
-		"tsc": "bunx tsc --noEmit"
+		"tsc": "bunx tsc --noEmit",
+		"build:js": "esbuild public/js/movember-scraper.js --bundle --minify --sourcemap --outfile=public/js/bundle.js --format=esm --target=es2020",
+		"build": "npm run build:js"
 	},
 	"keywords": [
 		"cloudflare",
@@ -21,8 +23,9 @@
 	"author": "",
 	"license": "MIT",
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20251106.1",
 		"@biomejs/biome": "^2.3.4",
+		"@cloudflare/workers-types": "^4.20251106.1",
+		"esbuild": "^0.25.12",
 		"typescript": "^5.9.3",
 		"wrangler": "^4.46.0"
 	}

@@ -43,73 +43,58 @@ export const COUNTRY_DETECTION_PATTERNS = {
 // Dollar amount pattern (ambiguous, used as fallback)
 export const DOLLAR_AMOUNT_PATTERN = /\$[\d,]+/;
 
-// Raised amount extraction patterns (11 patterns)
+// Raised amount extraction patterns (optimized with combined patterns)
+// Patterns are grouped by similarity and combined using alternation for better performance
 export const RAISED_PATTERNS = [
-	// Pattern 1: Look for convertedAmount in AmountRaised object (most reliable)
-	/"AmountRaised"[^}]*"convertedAmount"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
-	// Pattern 2: Look for originalAmount in AmountRaised object
-	/"AmountRaised"[^}]*"originalAmount"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
-	// Pattern 3: Look for the CSS class with amount
+	// Group 1: AmountRaised object patterns (most reliable) - combined
+	/"AmountRaised"[^}]*"(?:convertedAmount|originalAmount)"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
+	// Group 2: CSS class patterns with dollar sign - combined
 	/donationProgress--amount__raised[^>]*>([^<]*\$([\d,]+(?:\.\d+)?)[^<]*)/i,
-	// Pattern 4: Look for the class followed by text content
+	// Group 3: CSS class with class attribute - separate (different structure)
 	/class="[^"]*donationProgress--amount__raised[^"]*"[^>]*>[\s\S]*?\$([\d,]+(?:\.\d+)?)/i,
-	// Pattern 5: Look for data attributes or JSON with proper number format
-	/"raised"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 6: Look for raisedAmount or similar
-	/"raisedAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 7: Look for currentAmount or similar
-	/"currentAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 8: Look for amount in data attributes
-	/data-raised=["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 9: Look for amount in data-amount attribute
-	/data-amount=["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 10: Support different currency formats (€, £, etc.)
+	// Group 4: JSON property patterns - combined
+	/"(?:raised|raisedAmount|currentAmount)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Group 5: Data attribute patterns - combined
+	/data-(?:raised|amount)=["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Group 6: CSS class with currency symbols - separate (different capture groups)
 	/donationProgress--amount__raised[^>]*>([^<]*[€£$]([\d,]+(?:\.\d+)?)[^<]*)/i,
-	// Pattern 11: Look for currency codes (USD, EUR, GBP, etc.)
+	// Group 7: CSS class with currency codes - separate (different capture groups)
 	/donationProgress--amount__raised[^>]*>([^<]*(?:USD|EUR|GBP|AUD)\s*([\d,]+(?:\.\d+)?)[^<]*)/i,
 ];
 
-// Target amount extraction patterns (10 patterns)
+// Target amount extraction patterns (optimized with combined patterns)
+// Patterns are grouped by similarity and combined using alternation for better performance
 export const TARGET_PATTERNS = [
-	// Pattern 1: Look for target.fundraising.value (most reliable)
+	// Group 1: target.fundraising.value (most reliable) - separate (most specific)
 	/"target"[^}]*"fundraising"[^}]*"value"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
-	// Pattern 2: Look for targetAmount in JSON
-	/"targetAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 3: Look for the CSS class with amount
+	// Group 2: CSS class patterns with dollar sign - combined
 	/donationProgress--amount__target[^>]*>([^<]*\$([\d,]+(?:\.\d+)?)[^<]*)/i,
-	// Pattern 4: Look for the class followed by text content
+	// Group 3: CSS class with class attribute - separate (different structure)
 	/class="[^"]*donationProgress--amount__target[^"]*"[^>]*>[\s\S]*?\$([\d,]+(?:\.\d+)?)/i,
-	// Pattern 5: Look for data attributes or JSON with proper number format
-	/"target"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 6: Look for goal or similar
-	/"goal"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 7: Look for amount in data attributes
-	/data-target=["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 8: Look for amount in data-goal attribute
-	/data-goal=["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Pattern 9: Support different currency formats (€, £, etc.)
+	// Group 4: JSON property patterns - combined
+	/"(?:target|targetAmount|goal)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Group 5: Data attribute patterns - combined
+	/data-(?:target|goal)=["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Group 6: CSS class with currency symbols - separate (different capture groups)
 	/donationProgress--amount__target[^>]*>([^<]*[€£$]([\d,]+(?:\.\d+)?)[^<]*)/i,
-	// Pattern 10: Look for currency codes (USD, EUR, GBP, etc.)
+	// Group 7: CSS class with currency codes - separate (different capture groups)
 	/donationProgress--amount__target[^>]*>([^<]*(?:USD|EUR|GBP|AUD)\s*([\d,]+(?:\.\d+)?)[^<]*)/i,
 ];
 
-// JSON script tag patterns for raised amounts
+// JSON script tag patterns for raised amounts (optimized with combined patterns)
 export const RAISED_JSON_PATTERNS = [
-	/"raised"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/"raisedAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/"currentAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/"donationAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/"amount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Combined JSON property patterns
+	/"(?:raised|raisedAmount|currentAmount|donationAmount|amount)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Unquoted property pattern (separate due to different structure)
 	/raised[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
 ];
 
-// JSON script tag patterns for target amounts
+// JSON script tag patterns for target amounts (optimized with combined patterns)
 export const TARGET_JSON_PATTERNS = [
-	/"target"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/"targetAmount"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/"goal"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/target[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	/goal[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Combined JSON property patterns
+	/"(?:target|targetAmount|goal)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
+	// Unquoted property patterns - combined
+	/(?:target|goal)[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
 ];
 
 // Generic fallback patterns for raised amounts

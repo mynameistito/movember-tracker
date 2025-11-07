@@ -1,4 +1,11 @@
-// Helper function to format duration in human-readable format
+/**
+ * Format duration in human-readable format
+ * @param {number} ms - Duration in milliseconds
+ * @returns {string} Formatted duration string (e.g., "2m 30s (150000ms)" or "45s (45000ms)")
+ * @example
+ * formatDuration(150000) // "2m 30s (150000ms)"
+ * formatDuration(45000) // "45s (45000ms)"
+ */
 export const formatDuration = (ms) => {
 	const seconds = Math.round(ms / 1000);
 	const minutes = Math.floor(seconds / 60);
@@ -10,5 +17,11 @@ export const formatDuration = (ms) => {
 	return `${seconds}s (${ms}ms)`;
 };
 
-// Helper function to sleep
+/**
+ * Sleep for a specified duration (useful for delays/retries)
+ * @param {number} ms - Duration to sleep in milliseconds
+ * @returns {Promise<void>} Promise that resolves after the specified duration
+ * @example
+ * await sleep(1000); // Sleep for 1 second
+ */
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

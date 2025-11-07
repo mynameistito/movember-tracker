@@ -32,6 +32,52 @@ export function getCachedData(memberId) {
 }
 
 /**
+ * Get stale cached data for a member (even if expired)
+ * Used for stale-while-revalidate pattern
+ * @param {string} memberId - Member ID
+ * @returns {Object|null} Stale cached data or null if not found
+ * Data structure: { amount, currency, target, percentage, timestamp, subdomain }
+ */
+export function getStaleCachedData(memberId) {
+	try {
+		const cacheKey = `movember:data:${memberId}`;
+		const cached = localStorage.getItem(cacheKey);
+		if (!cached) return null;
+
+		const { data } = JSON.parse(cached);
+
+		// Return data even if expired (for stale-while-revalidate)
+		// Only return null if cache doesn't exist
+		return data;
+	} catch (error) {
+		logger.warn("[CACHE]", "Error reading stale cached data:", error);
+		return null;
+	}
+}
+
+/**
+ * Check if cached data is stale (expired but still available)
+ * @param {string} memberId - Member ID
+ * @returns {boolean} True if data exists but is expired, false otherwise
+ */
+export function isCachedDataStale(memberId) {
+	try {
+		const cacheKey = `movember:data:${memberId}`;
+		const cached = localStorage.getItem(cacheKey);
+		if (!cached) return false;
+
+		const { cachedAt, ttl } = JSON.parse(cached);
+		const now = Date.now();
+
+		// Check if cache is expired
+		return now - cachedAt > ttl;
+	} catch (error) {
+		logger.warn("[CACHE]", "Error checking if cached data is stale:", error);
+		return false;
+	}
+}
+
+/**
  * Set cached donation data for a member (includes subdomain)
  * @param {string} memberId - Member ID
  * @param {Object} data - Data to cache (must include subdomain)

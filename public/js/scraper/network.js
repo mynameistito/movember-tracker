@@ -4,6 +4,7 @@
  */
 
 import { getProxyUrl, MOVEMBER_BASE_URL_TEMPLATE } from "../constants.js";
+import { trackNetworkError } from "../error-tracking.js";
 import logger from "../logger.js";
 import { URL_PATTERNS } from "../regex-patterns.js";
 
@@ -48,7 +49,18 @@ export async function fetchViaProxy(url) {
 			// Ignore parse errors, use default error message
 			logger.warn("[PROXY]", "Could not parse error response:", e);
 		}
-		throw new Error(errorMessage);
+
+		const error = new Error(errorMessage);
+		// Track network error with structured context
+		trackNetworkError(error, {
+			url,
+			metadata: {
+				status: response.status,
+				statusText: response.statusText,
+			},
+		});
+
+		throw error;
 	}
 
 	// Worker proxy returns HTML directly

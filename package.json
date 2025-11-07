@@ -12,7 +12,10 @@
 		"format": "bunx @biomejs/biome format --write .",
 		"tsc": "bunx tsc --noEmit",
 		"build:js": "esbuild public/js/movember-scraper.js --bundle --minify --sourcemap --outfile=public/js/bundle.js --format=esm --target=es2020",
-		"build": "npm run build:js"
+		"build": "npm run build:js",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:coverage": "vitest --coverage"
 	},
 	"keywords": [
 		"cloudflare",
@@ -25,8 +28,12 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.4",
 		"@cloudflare/workers-types": "^4.20251106.1",
+		"@vitest/coverage-v8": "^4.0.7",
+		"@vitest/ui": "^4.0.7",
 		"esbuild": "^0.25.12",
+		"happy-dom": "^20.0.10",
 		"typescript": "^5.9.3",
+		"vitest": "^4.0.7",
 		"wrangler": "^4.46.0"
 	}
 }

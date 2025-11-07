@@ -477,8 +477,17 @@ export function extractTargetAmount(html) {
 			const pattern = GENERIC_TARGET_PATTERNS[i];
 			const match = html.match(pattern);
 			if (match) {
-				const captured = match[1];
-				if (isValidNumber(captured)) {
+				// Iterate backward from the last capture group to index 1
+				// Pick the first non-empty capture that passes isValidNumber
+				let captured = null;
+				for (let j = match.length - 1; j >= 1; j--) {
+					if (match[j] && isValidNumber(match[j])) {
+						captured = match[j];
+						break;
+					}
+				}
+
+				if (captured) {
 					target = captured;
 					logger.info(
 						"[SCRAPE]",
@@ -488,7 +497,7 @@ export function extractTargetAmount(html) {
 				} else {
 					logger.warn(
 						"[SCRAPE]",
-						`Generic target pattern ${i + 1} matched but invalid number: "${captured}"`,
+						`Generic target pattern ${i + 1} matched but no valid number found in capture groups`,
 					);
 				}
 			}

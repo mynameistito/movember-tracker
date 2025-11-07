@@ -1,5 +1,6 @@
 // localStorage cache manager with TTL support
-// Consolidated cache: all data (including subdomain) stored in single key per member
+// Subdomain stored in separate cache key (movember:subdomain:${memberId}) with 24h TTL
+// Data stored in separate cache key (movember:data:${memberId}) with 5min TTL
 import { SUBDOMAIN_CACHE_TTL } from "./constants.js";
 import logger from "./logger.js";
 
@@ -98,31 +99,27 @@ export function setCachedData(memberId, data, ttl) {
 }
 
 /**
- * Get cached subdomain for a member (from consolidated cache)
- * Uses subdomain TTL (24h) not data TTL (5min) - subdomain persists longer
+ * Get cached subdomain for a member (from separate cache key)
+ * Uses subdomain TTL (24h) independent of data TTL (5min) - subdomain persists longer
  * @param {string} memberId - Member ID
  * @returns {string|null} Cached subdomain or null if expired/not found
  */
 export function getCachedSubdomain(memberId) {
 	try {
-		const cacheKey = `movember:data:${memberId}`;
+		const cacheKey = `movember:subdomain:${memberId}`;
 		const cached = localStorage.getItem(cacheKey);
 		if (!cached) return null;
 
-		const { data, cachedAt } = JSON.parse(cached);
+		const { subdomain, cachedAt, ttl } = JSON.parse(cached);
 		const now = Date.now();
 
-		// For subdomain, use SUBDOMAIN_CACHE_TTL (24h) instead of data TTL (5min)
-		// Check if subdomain exists in data
-		if (data?.subdomain) {
-			// Use longer TTL for subdomain (24 hours)
-			if (now - cachedAt > SUBDOMAIN_CACHE_TTL) {
-				// Subdomain expired, but don't remove cache yet (data might still be valid)
-				return null;
-			}
-			return data.subdomain;
+		// Check if cache is expired using the stored TTL
+		if (now - cachedAt > ttl) {
+			localStorage.removeItem(cacheKey);
+			return null;
 		}
-		return null;
+
+		return subdomain;
 	} catch (error) {
 		logger.warn("[CACHE]", "Error reading cached subdomain:", error);
 		return null;
@@ -130,24 +127,20 @@ export function getCachedSubdomain(memberId) {
 }
 
 /**
- * Set cached subdomain for a member (updates consolidated cache)
+ * Set cached subdomain for a member (uses separate cache key with independent TTL)
  * @param {string} memberId - Member ID
  * @param {string} subdomain - Subdomain to cache
- * @param {number} ttl - Time to live in milliseconds
+ * @param {number} ttl - Time to live in milliseconds (typically SUBDOMAIN_CACHE_TTL)
  */
 export function setCachedSubdomain(memberId, subdomain, ttl) {
 	try {
-		// Get existing data or create new
-		let data = getCachedData(memberId);
-		if (!data) {
-			data = {};
-		}
-
-		// Update subdomain in data
-		data.subdomain = subdomain;
-
-		// Save with the provided TTL
-		setCachedData(memberId, data, ttl);
+		const cacheKey = `movember:subdomain:${memberId}`;
+		const cacheValue = {
+			subdomain,
+			cachedAt: Date.now(),
+			ttl,
+		};
+		localStorage.setItem(cacheKey, JSON.stringify(cacheValue));
 	} catch (error) {
 		logger.warn("[CACHE]", "Error setting cached subdomain:", error);
 	}
@@ -162,9 +155,9 @@ export function clearSubdomainCache(memberId) {
 		const cacheKey = `movember:data:${memberId}`;
 		localStorage.removeItem(cacheKey);
 
-		// Also clear old separate subdomain cache if it exists (migration cleanup)
-		const oldSubdomainKey = `movember:subdomain:${memberId}`;
-		localStorage.removeItem(oldSubdomainKey);
+		// Clear separate subdomain cache
+		const subdomainKey = `movember:subdomain:${memberId}`;
+		localStorage.removeItem(subdomainKey);
 
 		// Also clear old amount cache if it exists (migration cleanup)
 		const oldAmountKey = `movember:amount:${memberId}`;

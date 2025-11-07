@@ -116,42 +116,43 @@ describe("cache.js", () => {
 			expect(cached).toBeNull();
 		});
 
-		it("should update subdomain in existing cache", () => {
+		it("should store subdomain independently of data cache", () => {
 			const memberId = "12345";
 			const data = {
 				amount: "$1,234.56",
 				currency: "USD",
-				subdomain: "us",
 				timestamp: Date.now(),
 			};
-			const ttl = 300000;
+			const dataTtl = 300000; // 5 minutes
+			const subdomainTtl = 86400000; // 24 hours
 
-			setCachedData(memberId, data, ttl);
-			setCachedSubdomain(memberId, "uk", ttl);
+			setCachedData(memberId, data, dataTtl);
+			setCachedSubdomain(memberId, "uk", subdomainTtl);
 
-			const cached = getCachedData(memberId);
-			expect(cached.subdomain).toBe("uk");
+			// Subdomain should be stored separately and retrievable
+			const cachedSubdomain = getCachedSubdomain(memberId);
+			expect(cachedSubdomain).toBe("uk");
+
+			// Data cache should remain unchanged (subdomain not in data)
+			const cachedData = getCachedData(memberId);
+			expect(cachedData).toEqual(data);
+			expect(cachedData.subdomain).toBeUndefined();
 		});
 
 		it("should return null for expired subdomain cache", () => {
 			const memberId = "12345";
-			const data = {
-				amount: "$1,234.56",
-				currency: "USD",
-				subdomain: "us",
-				timestamp: Date.now(),
-			};
-			const ttl = 300000;
+			const subdomain = "uk";
+			const ttl = 86400000; // 24 hours
 
-			setCachedData(memberId, data, ttl);
-			// Manually expire the cache by setting cachedAt to past (beyond SUBDOMAIN_CACHE_TTL)
-			const cacheKey = `movember:data:${memberId}`;
+			setCachedSubdomain(memberId, subdomain, ttl);
+			// Manually expire the subdomain cache by setting cachedAt to past
+			const subdomainKey = `movember:subdomain:${memberId}`;
 			const cacheValue = {
-				data,
+				subdomain,
 				cachedAt: Date.now() - 90000000, // 25 hours ago
 				ttl,
 			};
-			localStorageMock.setItem(cacheKey, JSON.stringify(cacheValue));
+			localStorageMock.setItem(subdomainKey, JSON.stringify(cacheValue));
 
 			const cached = getCachedSubdomain(memberId);
 			expect(cached).toBeNull();

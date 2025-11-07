@@ -56,7 +56,11 @@ initializeLogLevel();
 /**
  * Format log message with prefix
  */
-function formatMessage(level: string, prefix: string, ...args: unknown[]): unknown[] {
+function formatMessage(
+	level: string,
+	prefix: string,
+	...args: unknown[]
+): unknown[] {
 	const timestamp = new Date().toISOString();
 	return [`[${timestamp}] [${level}] ${prefix}`, ...args];
 }
@@ -156,4 +160,3 @@ export const logger = {
 
 // Export default logger
 export default logger;
-

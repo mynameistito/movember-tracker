@@ -1,7 +1,6 @@
 // localStorage cache manager with TTL support
 // Subdomain stored in separate cache key (movember:subdomain:${memberId}) with 24h TTL
 // Data stored in separate cache key (movember:data:${memberId}) with 5min TTL
-import { SUBDOMAIN_CACHE_TTL } from "./constants.js";
 import logger from "./logger.js";
 
 export interface CachedData {
@@ -105,7 +104,11 @@ export function isCachedDataStale(memberId: string): boolean {
  * @param data - Data to cache (must include subdomain)
  * @param ttl - Time to live in milliseconds
  */
-export function setCachedData(memberId: string, data: CachedData, ttl: number): void {
+export function setCachedData(
+	memberId: string,
+	data: CachedData,
+	ttl: number,
+): void {
 	try {
 		const cacheKey = `movember:data:${memberId}`;
 		const cacheValue: CacheEntry<CachedData> = {
@@ -153,7 +156,11 @@ export function getCachedSubdomain(memberId: string): string | null {
  * @param subdomain - Subdomain to cache
  * @param ttl - Time to live in milliseconds (typically SUBDOMAIN_CACHE_TTL)
  */
-export function setCachedSubdomain(memberId: string, subdomain: string, ttl: number): void {
+export function setCachedSubdomain(
+	memberId: string,
+	subdomain: string,
+	ttl: number,
+): void {
 	try {
 		const cacheKey = `movember:subdomain:${memberId}`;
 		const cacheValue: SubdomainCacheEntry = {
@@ -187,4 +194,3 @@ export function clearSubdomainCache(memberId: string): void {
 		logger.warn("[CACHE]", "Error clearing cached data:", error);
 	}
 }
-

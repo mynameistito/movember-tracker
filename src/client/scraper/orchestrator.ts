@@ -4,13 +4,13 @@
  */
 
 import {
+	type CachedData,
 	clearSubdomainCache,
 	getCachedData,
 	getStaleCachedData,
 	isCachedDataStale,
 	setCachedData,
 	setCachedSubdomain,
-	type CachedData,
 } from "../cache.js";
 import {
 	CACHE_TTL,
@@ -196,7 +196,10 @@ export async function scrapeMovemberPage(
 		}
 
 		// Parse amount with subdomain to determine correct currency
-		const { value: raisedValue, currency } = parseAmount(`$${raised}`, subdomain);
+		const { value: raisedValue, currency } = parseAmount(
+			`$${raised}`,
+			subdomain,
+		);
 
 		// Validate the parsed value is not empty or zero (unless it's actually zero)
 		if (!raisedValue || raisedValue === "0" || raisedValue === "") {
@@ -249,15 +252,18 @@ export async function scrapeMovemberPage(
 		const errorMessage = error instanceof Error ? error.message : String(error);
 
 		// Track error with structured context
-		trackScrapingError(error instanceof Error ? error : new Error(errorMessage), {
-			memberId,
-			subdomain,
-			url: movemberUrl,
-			metadata: {
-				duration: totalDuration,
-				timestamp: Date.now(),
+		trackScrapingError(
+			error instanceof Error ? error : new Error(errorMessage),
+			{
+				memberId,
+				subdomain,
+				url: movemberUrl,
+				metadata: {
+					duration: totalDuration,
+					timestamp: Date.now(),
+				},
 			},
-		});
+		);
 
 		logger.error(
 			"[SCRAPE]",
@@ -430,6 +436,13 @@ export async function getData(
 		}
 	}
 
-	return { data: data!, cacheStatus };
-}
+	// Type guard: data should never be null at this point, but TypeScript can't guarantee it
+	// This is a safety check in case of unexpected code paths
+	if (!data) {
+		throw new Error(
+			`Unexpected null data for memberId: ${memberId}. This should never happen.`,
+		);
+	}
 
+	return { data, cacheStatus };
+}

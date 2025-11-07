@@ -128,4 +128,3 @@ export const GENERIC_TARGET_PATTERNS: RegExp[] = [
 	/target[:\s=]+[$]?([\d,]+(?:\.\d+)?)/i,
 	/goal[:\s=]+[$]?([\d,]+(?:\.\d+)?)/i,
 ];
-

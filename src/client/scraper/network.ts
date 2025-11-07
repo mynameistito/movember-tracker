@@ -86,4 +86,3 @@ export function buildMovemberUrl(memberId: string, subdomain: string): string {
 	const baseUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain);
 	return `${baseUrl}?memberId=${memberId}`;
 }
-

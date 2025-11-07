@@ -15,7 +15,10 @@ export interface ParsedAmount {
  * parseAmount("$1,234.56", "us") // { value: "1,234.56", currency: "USD" }
  * parseAmount("£500", "uk") // { value: "500", currency: "GBP" }
  */
-export const parseAmount = (text: string, subdomain: string | null | undefined): ParsedAmount => {
+export const parseAmount = (
+	text: string,
+	subdomain: string | null | undefined,
+): ParsedAmount => {
 	// Remove whitespace and extract amount
 	const cleaned = text.trim();
 
@@ -81,4 +84,3 @@ export const calculatePercentage = (raised: string, target: string): number => {
 	if (targetNum === 0) return 0;
 	return Math.round((raisedNum / targetNum) * 100);
 };
-

@@ -37,9 +37,27 @@
     const urlParams = new URLSearchParams(window.location.search);
     const memberId = urlParams.get('memberId') || urlParams.get('memberid') || DEFAULT_MEMBER_ID;
     
-    async function updateData() {
+    // Parse interval from URL query parameter (in seconds), default to 300 seconds (5 minutes)
+    const intervalParam = urlParams.get('interval');
+    const intervalSeconds = intervalParam ? parseInt(intervalParam, 10) : 300;
+    const FRESH_FETCH_INTERVAL = (intervalSeconds > 0 ? intervalSeconds : 300) * 1000; // Convert to milliseconds, default to 5 minutes if invalid
+    let lastFreshFetchTime = null;
+    
+    async function updateData(forceFresh = false) {
       try {
-        const { data } = await getData(memberId);
+        const now = Date.now();
+        // Check if configured interval has passed since last fresh fetch, or if forced
+        const shouldForceFresh = forceFresh || 
+          (lastFreshFetchTime === null) || 
+          (now - lastFreshFetchTime >= FRESH_FETCH_INTERVAL);
+        
+        // Force fresh scrape if needed (grabLive = true)
+        const grabLive = shouldForceFresh;
+        if (grabLive) {
+          lastFreshFetchTime = now;
+        }
+        
+        const { data } = await getData(memberId, grabLive);
         
         if (data.amount && (data.amount !== currentData.amount || data.target !== currentData.target)) {
           amountElement.classList.add('opacity-70');
@@ -67,11 +85,12 @@
       }
     }
     
-    // Update every 30 seconds (cache is 5 minutes, but we check more frequently)
-    setInterval(updateData, 30000);
+    // Update every 30 seconds (check more frequently than the refresh interval)
+    // The updateData function will automatically force fresh fetch at the configured interval
+    setInterval(() => updateData(false), 30000);
     
-    // Also update immediately on page load after a short delay
-    setTimeout(updateData, 1000);
+    // Also update immediately on page load with fresh fetch (grabLive = true)
+    setTimeout(() => updateData(true), 1000);
   </script>
 </body>
 </html>

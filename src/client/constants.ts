@@ -47,7 +47,9 @@ export const SUBDOMAIN_CURRENCY_MAP: Record<string, string> = {
  * getCurrencyFromSubdomain("au") // "AUD"
  * getCurrencyFromSubdomain("us") // "USD"
  */
-export function getCurrencyFromSubdomain(subdomain: string | null | undefined): string {
+export function getCurrencyFromSubdomain(
+	subdomain: string | null | undefined,
+): string {
 	if (!subdomain) {
 		return "AUD"; // Default currency
 	}
@@ -78,7 +80,9 @@ const CURRENCY_SYMBOL_MAP: Record<string, string> = {
  * getCurrencySymbol("GBP") // "£"
  * getCurrencySymbol("EUR") // "€"
  */
-export function getCurrencySymbol(currencyCode: string | null | undefined): string {
+export function getCurrencySymbol(
+	currencyCode: string | null | undefined,
+): string {
 	if (!currencyCode) {
 		return "$"; // Default symbol
 	}
@@ -96,4 +100,3 @@ export function getProxyUrl(): string {
 	// Use the current origin (the Worker's domain) for the proxy
 	return `${window.location.origin}/proxy`;
 }
-

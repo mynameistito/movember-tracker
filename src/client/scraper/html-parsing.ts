@@ -44,7 +44,8 @@ function extractRaisedAmountWithDOMParser(html: string): string {
 		for (const selector of selectors) {
 			const elements = doc.querySelectorAll(selector);
 			for (const element of Array.from(elements)) {
-				const text = element.textContent || (element as HTMLElement).innerText || "";
+				const text =
+					element.textContent || (element as HTMLElement).innerText || "";
 				// Try to extract amount from text
 				const amountMatch = text.match(/[\d,]+(?:\.\d+)?/);
 				if (amountMatch && isValidNumber(amountMatch[0])) {
@@ -332,7 +333,8 @@ function extractTargetAmountWithDOMParser(html: string): string {
 		for (const selector of selectors) {
 			const elements = doc.querySelectorAll(selector);
 			for (const element of Array.from(elements)) {
-				const text = element.textContent || (element as HTMLElement).innerText || "";
+				const text =
+					element.textContent || (element as HTMLElement).innerText || "";
 				// Try to extract amount from text
 				const amountMatch = text.match(/[\d,]+(?:\.\d+)?/);
 				if (amountMatch && isValidNumber(amountMatch[0])) {
@@ -624,4 +626,3 @@ export function extractAmounts(
 
 	return { raised, target };
 }
-

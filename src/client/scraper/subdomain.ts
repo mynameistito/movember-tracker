@@ -29,7 +29,9 @@ import {
  * @param html - The HTML content to analyze
  * @returns The detected subdomain or null if not found
  */
-export function detectSubdomainFromHtml(html: string | null | undefined): string | null {
+export function detectSubdomainFromHtml(
+	html: string | null | undefined,
+): string | null {
 	if (!html) return null;
 
 	// First, check for unambiguous currency symbols anywhere in HTML (most reliable)
@@ -357,4 +359,3 @@ export async function getSubdomainForMember(memberId: string): Promise<string> {
 	// Auto-detect (will check cache internally)
 	return await detectSubdomainForMember(memberId);
 }
-

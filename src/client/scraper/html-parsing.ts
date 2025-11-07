@@ -4,7 +4,7 @@
  */
 
 import { formatDuration } from "../formatting.js";
-import logger from "../logger.js";
+import { logger } from "../logger.js";
 import { isValidNumber } from "../parsing.js";
 import {
 	GENERIC_RAISED_PATTERNS,

@@ -3,7 +3,11 @@
  * @module scraper/network
  */
 
-import { getProxyUrl, MOVEMBER_BASE_URL_TEMPLATE } from "../constants.js";
+import {
+	getProxyUrl,
+	MOVEMBER_BASE_URL_TEMPLATE,
+	MOVEMBER_TEAM_URL_TEMPLATE,
+} from "../constants.js";
 import { trackNetworkError } from "../error-tracking.js";
 import logger from "../logger.js";
 import { URL_PATTERNS } from "../regex-patterns.js";
@@ -85,4 +89,15 @@ export async function fetchViaProxy(url: string): Promise<FetchResult> {
 export function buildMovemberUrl(memberId: string, subdomain: string): string {
 	const baseUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain);
 	return `${baseUrl}?memberId=${memberId}`;
+}
+
+/**
+ * Build Movember team URL with correct subdomain for a team
+ * @param teamId - The team ID
+ * @param subdomain - The subdomain to use
+ * @returns The complete Movember team URL
+ */
+export function buildTeamUrl(teamId: string, subdomain: string): string {
+	const baseUrl = MOVEMBER_TEAM_URL_TEMPLATE.replace("{subdomain}", subdomain);
+	return baseUrl.replace("{id}", teamId);
 }

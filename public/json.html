@@ -13,18 +13,21 @@
     </div>
   </div>
   <script type="module">
-    import { DEFAULT_MEMBER_ID, getData } from './js/bundle.js';
+    import { DEFAULT_MEMBER_ID, getData, getTeamData } from './js/bundle.js';
 
-    // Get memberId from URL query parameters
+    // Get memberId or teamId from URL query parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || DEFAULT_MEMBER_ID;
+    const teamId = urlParams.get('teamId') || urlParams.get('teamid');
+    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || (teamId ? null : DEFAULT_MEMBER_ID);
     const grabLive = urlParams.has('grab-live');
 
     async function loadData() {
       const contentDiv = document.getElementById('content');
       
       try {
-        const { data } = await getData(memberId, grabLive);
+        const { data } = teamId 
+          ? await getTeamData(teamId, grabLive)
+          : await getData(memberId, grabLive);
         
         // Display as JSON
         contentDiv.innerHTML = `<pre class="bg-black border border-gray-800 rounded-lg p-5 font-mono text-green-500 text-sm overflow-x-auto leading-relaxed">${JSON.stringify(data, null, 2)}</pre>`;

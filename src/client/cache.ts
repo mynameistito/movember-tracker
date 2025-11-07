@@ -1,7 +1,23 @@
 // localStorage cache manager with TTL support
-// Subdomain stored in separate cache key (movember:subdomain:${memberId}) with 24h TTL
-// Data stored in separate cache key (movember:data:${memberId}) with 5min TTL
+// Subdomain stored in separate cache key (movember:subdomain:${type}:${id}) with 24h TTL
+// Data stored in separate cache key (movember:data:${type}:${id}) with 5min TTL
+// Types: "member" or "team"
 import logger from "./logger.js";
+
+/**
+ * Create cache key with proper namespacing for member or team
+ * @param type - "member" or "team"
+ * @param id - The ID (memberId or teamId)
+ * @param prefix - Cache prefix (e.g., "data" or "subdomain")
+ * @returns The cache key
+ */
+function createCacheKey(
+	type: "member" | "team",
+	id: string,
+	prefix: string,
+): string {
+	return `movember:${prefix}:${type}:${id}`;
+}
 
 export interface CachedData {
 	amount: string;
@@ -25,14 +41,18 @@ interface SubdomainCacheEntry {
 }
 
 /**
- * Get cached donation data for a member (includes subdomain)
- * @param memberId - Member ID
+ * Get cached donation data for a member or team (includes subdomain)
+ * @param type - "member" or "team"
+ * @param id - Member ID or Team ID
  * @returns Cached data or null if expired/not found
  * Data structure: { amount, currency, target, percentage, timestamp, subdomain }
  */
-export function getCachedData(memberId: string): CachedData | null {
+export function getCachedData(
+	type: "member" | "team",
+	id: string,
+): CachedData | null {
 	try {
-		const cacheKey = `movember:data:${memberId}`;
+		const cacheKey = createCacheKey(type, id, "data");
 		const cached = localStorage.getItem(cacheKey);
 		if (!cached) return null;
 
@@ -53,15 +73,19 @@ export function getCachedData(memberId: string): CachedData | null {
 }
 
 /**
- * Get stale cached data for a member (even if expired)
+ * Get stale cached data for a member or team (even if expired)
  * Used for stale-while-revalidate pattern
- * @param memberId - Member ID
+ * @param type - "member" or "team"
+ * @param id - Member ID or Team ID
  * @returns Stale cached data or null if not found
  * Data structure: { amount, currency, target, percentage, timestamp, subdomain }
  */
-export function getStaleCachedData(memberId: string): CachedData | null {
+export function getStaleCachedData(
+	type: "member" | "team",
+	id: string,
+): CachedData | null {
 	try {
-		const cacheKey = `movember:data:${memberId}`;
+		const cacheKey = createCacheKey(type, id, "data");
 		const cached = localStorage.getItem(cacheKey);
 		if (!cached) return null;
 
@@ -78,12 +102,16 @@ export function getStaleCachedData(memberId: string): CachedData | null {
 
 /**
  * Check if cached data is stale (expired but still available)
- * @param memberId - Member ID
+ * @param type - "member" or "team"
+ * @param id - Member ID or Team ID
  * @returns True if data exists but is expired, false otherwise
  */
-export function isCachedDataStale(memberId: string): boolean {
+export function isCachedDataStale(
+	type: "member" | "team",
+	id: string,
+): boolean {
 	try {
-		const cacheKey = `movember:data:${memberId}`;
+		const cacheKey = createCacheKey(type, id, "data");
 		const cached = localStorage.getItem(cacheKey);
 		if (!cached) return false;
 
@@ -99,18 +127,20 @@ export function isCachedDataStale(memberId: string): boolean {
 }
 
 /**
- * Set cached donation data for a member (includes subdomain)
- * @param memberId - Member ID
+ * Set cached donation data for a member or team (includes subdomain)
+ * @param type - "member" or "team"
+ * @param id - Member ID or Team ID
  * @param data - Data to cache (must include subdomain)
  * @param ttl - Time to live in milliseconds
  */
 export function setCachedData(
-	memberId: string,
+	type: "member" | "team",
+	id: string,
 	data: CachedData,
 	ttl: number,
 ): void {
 	try {
-		const cacheKey = `movember:data:${memberId}`;
+		const cacheKey = createCacheKey(type, id, "data");
 		const cacheValue: CacheEntry<CachedData> = {
 			data,
 			cachedAt: Date.now(),
@@ -123,14 +153,18 @@ export function setCachedData(
 }
 
 /**
- * Get cached subdomain for a member (from separate cache key)
+ * Get cached subdomain for a member or team (from separate cache key)
  * Uses subdomain TTL (24h) independent of data TTL (5min) - subdomain persists longer
- * @param memberId - Member ID
+ * @param type - "member" or "team"
+ * @param id - Member ID or Team ID
  * @returns Cached subdomain or null if expired/not found
  */
-export function getCachedSubdomain(memberId: string): string | null {
+export function getCachedSubdomain(
+	type: "member" | "team",
+	id: string,
+): string | null {
 	try {
-		const cacheKey = `movember:subdomain:${memberId}`;
+		const cacheKey = createCacheKey(type, id, "subdomain");
 		const cached = localStorage.getItem(cacheKey);
 		if (!cached) return null;
 
@@ -151,18 +185,20 @@ export function getCachedSubdomain(memberId: string): string | null {
 }
 
 /**
- * Set cached subdomain for a member (uses separate cache key with independent TTL)
- * @param memberId - Member ID
+ * Set cached subdomain for a member or team (uses separate cache key with independent TTL)
+ * @param type - "member" or "team"
+ * @param id - Member ID or Team ID
  * @param subdomain - Subdomain to cache
  * @param ttl - Time to live in milliseconds (typically SUBDOMAIN_CACHE_TTL)
  */
 export function setCachedSubdomain(
-	memberId: string,
+	type: "member" | "team",
+	id: string,
 	subdomain: string,
 	ttl: number,
 ): void {
 	try {
-		const cacheKey = `movember:subdomain:${memberId}`;
+		const cacheKey = createCacheKey(type, id, "subdomain");
 		const cacheValue: SubdomainCacheEntry = {
 			subdomain,
 			cachedAt: Date.now(),
@@ -175,20 +211,21 @@ export function setCachedSubdomain(
 }
 
 /**
- * Clear cached data for a member (clears both data and subdomain)
- * @param memberId - Member ID
+ * Clear cached data for a member or team (clears both data and subdomain)
+ * @param type - "member" or "team"
+ * @param id - Member ID or Team ID
  */
-export function clearSubdomainCache(memberId: string): void {
+export function clearSubdomainCache(type: "member" | "team", id: string): void {
 	try {
-		const cacheKey = `movember:data:${memberId}`;
+		const cacheKey = createCacheKey(type, id, "data");
 		localStorage.removeItem(cacheKey);
 
 		// Clear separate subdomain cache
-		const subdomainKey = `movember:subdomain:${memberId}`;
+		const subdomainKey = createCacheKey(type, id, "subdomain");
 		localStorage.removeItem(subdomainKey);
 
 		// Also clear old amount cache if it exists (migration cleanup)
-		const oldAmountKey = `movember:amount:${memberId}`;
+		const oldAmountKey = `movember:amount:${type}:${id}`;
 		localStorage.removeItem(oldAmountKey);
 	} catch (error) {
 		logger.warn("[CACHE]", "Error clearing cached data:", error);

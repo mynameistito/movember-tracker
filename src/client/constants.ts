@@ -11,6 +11,8 @@ export const MEMBER_SUBDOMAIN_MAP: Record<string, string> = {
 export const DEFAULT_SUBDOMAIN = "au"; // Default subdomain to try first
 export const MOVEMBER_BASE_URL_TEMPLATE =
 	"https://{subdomain}.movember.com/donate/details";
+export const MOVEMBER_TEAM_URL_TEMPLATE =
+	"https://{subdomain}.movember.com/team/{id}";
 export const DEFAULT_MEMBER_ID = "14810348"; // Default member ID if none provided
 export const CACHE_TTL = 300000; // 5 minutes in milliseconds
 export const SUBDOMAIN_CACHE_TTL = 86400000; // 24 hours in milliseconds (subdomain mappings don't change often)

@@ -22,7 +22,10 @@ export {
 // Re-export from orchestrator (main entry point)
 export {
 	getData,
+	getTeamData,
 	scrapeMovemberPage,
+	scrapeTeamPage,
+	scrapeTeamWithRetry,
 	scrapeWithRetry,
 } from "./scraper/orchestrator.js";
 // Re-export from subdomain detection

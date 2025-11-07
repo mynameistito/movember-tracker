@@ -57,7 +57,10 @@ async function main() {
 			// biome-ignore lint/suspicious/noExplicitAny: Need to enhance window for Node.js environment
 			(globalThis as any).window.DOMParser = happyWindow.DOMParser;
 		} catch (error) {
-			console.warn("Could not load happy-dom, DOMParser will not be available:", error);
+			console.warn(
+				"Could not load happy-dom, DOMParser will not be available:",
+				error,
+			);
 		}
 	}
 
@@ -241,33 +244,47 @@ async function main() {
 
 						// First, check if the specific span elements exist
 						console.log();
-						console.log("Checking for span elements with donationProgress classes...");
-						const raisedSpans = doc.querySelectorAll("span.donationProgress--amount__raised, span[class*='donationProgress--amount__raised']");
-						const targetSpans = doc.querySelectorAll("span.donationProgress--amount__target, span[class*='donationProgress--amount__target']");
-						
-						console.log(`Found ${raisedSpans.length} span elements with donationProgress--amount__raised class`);
-						console.log(`Found ${targetSpans.length} span elements with donationProgress--amount__target class`);
-						
+						console.log(
+							"Checking for span elements with donationProgress classes...",
+						);
+						const raisedSpans = doc.querySelectorAll(
+							"span.donationProgress--amount__raised, span[class*='donationProgress--amount__raised']",
+						);
+						const targetSpans = doc.querySelectorAll(
+							"span.donationProgress--amount__target, span[class*='donationProgress--amount__target']",
+						);
+
+						console.log(
+							`Found ${raisedSpans.length} span elements with donationProgress--amount__raised class`,
+						);
+						console.log(
+							`Found ${targetSpans.length} span elements with donationProgress--amount__target class`,
+						);
+
 						if (raisedSpans.length > 0) {
 							console.log();
 							console.log("Raised span elements:");
-							Array.from(raisedSpans).slice(0, 3).forEach((el, i) => {
-								const text = el.textContent || "";
-								const classes = el.className || "";
-								console.log(`  ${i + 1}. Classes: ${classes}`);
-								console.log(`     Text: ${text.substring(0, 100)}...`);
-							});
+							Array.from(raisedSpans)
+								.slice(0, 3)
+								.forEach((el, i) => {
+									const text = el.textContent || "";
+									const classes = el.className || "";
+									console.log(`  ${i + 1}. Classes: ${classes}`);
+									console.log(`     Text: ${text.substring(0, 100)}...`);
+								});
 						}
-						
+
 						if (targetSpans.length > 0) {
 							console.log();
 							console.log("Target span elements:");
-							Array.from(targetSpans).slice(0, 3).forEach((el, i) => {
-								const text = el.textContent || "";
-								const classes = el.className || "";
-								console.log(`  ${i + 1}. Classes: ${classes}`);
-								console.log(`     Text: ${text.substring(0, 100)}...`);
-							});
+							Array.from(targetSpans)
+								.slice(0, 3)
+								.forEach((el, i) => {
+									const text = el.textContent || "";
+									const classes = el.className || "";
+									console.log(`  ${i + 1}. Classes: ${classes}`);
+									console.log(`     Text: ${text.substring(0, 100)}...`);
+								});
 						}
 
 						if (raisedValue) {
@@ -275,7 +292,11 @@ async function main() {
 							console.log("Searching for raised amount in HTML structure...");
 							// Find all elements that might contain the raised amount
 							const allElements = doc.querySelectorAll("*");
-							const foundElements: Array<{ element: string; text: string; classes: string }> = [];
+							const foundElements: Array<{
+								element: string;
+								text: string;
+								classes: string;
+							}> = [];
 							for (const el of Array.from(allElements)) {
 								const text = el.textContent || "";
 								if (text.includes(raisedValue.replace(/[.,]/g, ""))) {
@@ -291,7 +312,9 @@ async function main() {
 								}
 							}
 							if (foundElements.length > 0) {
-								console.log(`Found ${foundElements.length} elements containing raised amount:`);
+								console.log(
+									`Found ${foundElements.length} elements containing raised amount:`,
+								);
 								foundElements.forEach((item, i) => {
 									console.log(`  ${i + 1}. ${item.element}`);
 									console.log(`     Classes: ${item.classes}`);
@@ -304,7 +327,11 @@ async function main() {
 							console.log();
 							console.log("Searching for target amount in HTML structure...");
 							const allElements = doc.querySelectorAll("*");
-							const foundElements: Array<{ element: string; text: string; classes: string }> = [];
+							const foundElements: Array<{
+								element: string;
+								text: string;
+								classes: string;
+							}> = [];
 							for (const el of Array.from(allElements)) {
 								const text = el.textContent || "";
 								if (text.includes(targetValue.replace(/[.,]/g, ""))) {
@@ -320,22 +347,35 @@ async function main() {
 								}
 							}
 							if (foundElements.length > 0) {
-								console.log(`Found ${foundElements.length} elements containing target amount:`);
+								console.log(
+									`Found ${foundElements.length} elements containing target amount:`,
+								);
 								foundElements.forEach((item, i) => {
 									console.log(`  ${i + 1}. ${item.element}`);
 									console.log(`     Classes: ${item.classes}`);
 									if (item.element === "script") {
 										// For script tags, try to find JSON structure
 										const scriptText = item.text;
-										const jsonMatch = scriptText.match(/\{[^}]*"target"[^}]*\}/);
+										const jsonMatch = scriptText.match(
+											/\{[^}]*"target"[^}]*\}/,
+										);
 										if (jsonMatch) {
-											console.log(`     JSON snippet: ${jsonMatch[0].substring(0, 150)}...`);
+											console.log(
+												`     JSON snippet: ${jsonMatch[0].substring(0, 150)}...`,
+											);
 										}
 										// Look for the amount in context
-										const amountIndex = scriptText.indexOf(targetValue.replace(/[.,]/g, ""));
+										const amountIndex = scriptText.indexOf(
+											targetValue.replace(/[.,]/g, ""),
+										);
 										if (amountIndex !== -1) {
-											const context = scriptText.substring(Math.max(0, amountIndex - 100), Math.min(scriptText.length, amountIndex + 100));
-											console.log(`     Context around amount: ...${context}...`);
+											const context = scriptText.substring(
+												Math.max(0, amountIndex - 100),
+												Math.min(scriptText.length, amountIndex + 100),
+											);
+											console.log(
+												`     Context around amount: ...${context}...`,
+											);
 										}
 									} else {
 										console.log(`     Text: ${item.text}...`);
@@ -347,116 +387,179 @@ async function main() {
 						// Also check script tags for JSON data
 						console.log();
 						console.log("Checking script tags for JSON data...");
-						
+
 						// Check what the regex patterns are actually matching
 						if (raisedValue) {
 							console.log();
 							console.log("Finding where raised amount appears in HTML...");
 							// Try the actual regex patterns
-							const raisedPattern1 = /"AmountRaised"[^}]*"(?:convertedAmount|originalAmount)"["\s:]*["']([\d,]+(?:\.\d+)?)/i;
+							const raisedPattern1 =
+								/"AmountRaised"[^}]*"(?:convertedAmount|originalAmount)"["\s:]*["']([\d,]+(?:\.\d+)?)/i;
 							const match1 = html.match(raisedPattern1);
 							if (match1) {
 								const matchIndex = html.indexOf(match1[0]);
-								const context = html.substring(Math.max(0, matchIndex - 200), Math.min(html.length, matchIndex + match1[0].length + 200));
+								const context = html.substring(
+									Math.max(0, matchIndex - 200),
+									Math.min(html.length, matchIndex + match1[0].length + 200),
+								);
 								console.log(`  Pattern 1 matched: ${match1[0]}`);
 								console.log(`  Context: ...${context}...`);
 							}
-							
+
 							// Also search for the amount directly
 							const amountIndex = html.indexOf(raisedValue);
 							if (amountIndex !== -1) {
-								const context = html.substring(Math.max(0, amountIndex - 300), Math.min(html.length, amountIndex + raisedValue.length + 300));
+								const context = html.substring(
+									Math.max(0, amountIndex - 300),
+									Math.min(html.length, amountIndex + raisedValue.length + 300),
+								);
 								console.log();
-								console.log(`  Found amount "${raisedValue}" at position ${amountIndex}:`);
+								console.log(
+									`  Found amount "${raisedValue}" at position ${amountIndex}:`,
+								);
 								console.log(`  Context: ...${context}...`);
 							}
 						}
-						
+
 						if (targetValue) {
 							console.log();
 							console.log("Finding where target amount appears in HTML...");
 							// Try the actual regex patterns
-							const targetPattern1 = /"target"[^}]*"fundraising"[^}]*"value"["\s:]*["']([\d,]+(?:\.\d+)?)/i;
+							const targetPattern1 =
+								/"target"[^}]*"fundraising"[^}]*"value"["\s:]*["']([\d,]+(?:\.\d+)?)/i;
 							const match1 = html.match(targetPattern1);
 							if (match1) {
 								const matchIndex = html.indexOf(match1[0]);
-								const context = html.substring(Math.max(0, matchIndex - 200), Math.min(html.length, matchIndex + match1[0].length + 200));
+								const context = html.substring(
+									Math.max(0, matchIndex - 200),
+									Math.min(html.length, matchIndex + match1[0].length + 200),
+								);
 								console.log(`  Pattern 1 matched: ${match1[0]}`);
 								console.log(`  Context: ...${context}...`);
 							}
-							
+
 							// Also search for the amount directly
 							const amountIndex = html.indexOf(targetValue);
 							if (amountIndex !== -1) {
-								const context = html.substring(Math.max(0, amountIndex - 300), Math.min(html.length, amountIndex + targetValue.length + 300));
+								const context = html.substring(
+									Math.max(0, amountIndex - 300),
+									Math.min(html.length, amountIndex + targetValue.length + 300),
+								);
 								console.log();
-								console.log(`  Found amount "${targetValue}" at position ${amountIndex}:`);
+								console.log(
+									`  Found amount "${targetValue}" at position ${amountIndex}:`,
+								);
 								console.log(`  Context: ...${context}...`);
 							}
 						}
-						
+
 						// Check script tags for JSON
 						const scriptTags = doc.querySelectorAll("script");
 						let jsonScriptsFound = 0;
 						for (const script of Array.from(scriptTags)) {
-							const scriptContent = script.textContent || script.innerHTML || "";
+							const scriptContent =
+								script.textContent || script.innerHTML || "";
 							// Look for the actual amounts in script tags
-							if ((raisedValue && scriptContent.includes(raisedValue.replace(/[.,]/g, ""))) ||
-							    (targetValue && scriptContent.includes(targetValue.replace(/[.,]/g, "")))) {
+							if (
+								(raisedValue &&
+									scriptContent.includes(raisedValue.replace(/[.,]/g, ""))) ||
+								(targetValue &&
+									scriptContent.includes(targetValue.replace(/[.,]/g, "")))
+							) {
 								jsonScriptsFound++;
 								if (jsonScriptsFound <= 2) {
 									console.log();
-									console.log(`Script tag ${jsonScriptsFound} (contains amounts):`);
-									
+									console.log(
+										`Script tag ${jsonScriptsFound} (contains amounts):`,
+									);
+
 									// Try to find JSON objects containing the amounts
 									// Look for JSON-like structures around the amounts
 									if (raisedValue) {
-										const raisedIndex = scriptContent.indexOf(raisedValue.replace(/[.,]/g, ""));
+										const raisedIndex = scriptContent.indexOf(
+											raisedValue.replace(/[.,]/g, ""),
+										);
 										if (raisedIndex !== -1) {
 											// Try to extract a JSON object containing this
-											const before = scriptContent.substring(Math.max(0, raisedIndex - 500), raisedIndex);
-											const after = scriptContent.substring(raisedIndex, Math.min(scriptContent.length, raisedIndex + 500));
-											
+											const before = scriptContent.substring(
+												Math.max(0, raisedIndex - 500),
+												raisedIndex,
+											);
+											const after = scriptContent.substring(
+												raisedIndex,
+												Math.min(scriptContent.length, raisedIndex + 500),
+											);
+
 											// Find the opening brace before
 											const braceStart = before.lastIndexOf("{");
 											if (braceStart !== -1) {
 												// Try to find the matching closing brace
-												const jsonCandidate = scriptContent.substring(before.lastIndexOf("{"), Math.min(scriptContent.length, raisedIndex + 1000));
+												const jsonCandidate = scriptContent.substring(
+													before.lastIndexOf("{"),
+													Math.min(scriptContent.length, raisedIndex + 1000),
+												);
 												// Try to extract a valid JSON object
-												const jsonMatch = jsonCandidate.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+												const jsonMatch = jsonCandidate.match(
+													/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/,
+												);
 												if (jsonMatch) {
 													try {
 														const jsonObj = JSON.parse(jsonMatch[0]);
-														console.log(`  Contains JSON with raised: ${JSON.stringify(jsonObj, null, 2).substring(0, 500)}...`);
+														console.log(
+															`  Contains JSON with raised: ${JSON.stringify(jsonObj, null, 2).substring(0, 500)}...`,
+														);
 													} catch {
-														console.log(`  JSON-like structure: ${jsonMatch[0].substring(0, 300)}...`);
+														console.log(
+															`  JSON-like structure: ${jsonMatch[0].substring(0, 300)}...`,
+														);
 													}
 												} else {
-													console.log(`  Context around raised: ...${before.substring(before.length - 100)}${after.substring(0, 100)}...`);
+													console.log(
+														`  Context around raised: ...${before.substring(before.length - 100)}${after.substring(0, 100)}...`,
+													);
 												}
 											}
 										}
 									}
-									
+
 									if (targetValue) {
-										const targetIndex = scriptContent.indexOf(targetValue.replace(/[.,]/g, ""));
+										const targetIndex = scriptContent.indexOf(
+											targetValue.replace(/[.,]/g, ""),
+										);
 										if (targetIndex !== -1) {
-											const before = scriptContent.substring(Math.max(0, targetIndex - 500), targetIndex);
-											const after = scriptContent.substring(targetIndex, Math.min(scriptContent.length, targetIndex + 500));
-											
+											const before = scriptContent.substring(
+												Math.max(0, targetIndex - 500),
+												targetIndex,
+											);
+											const after = scriptContent.substring(
+												targetIndex,
+												Math.min(scriptContent.length, targetIndex + 500),
+											);
+
 											const braceStart = before.lastIndexOf("{");
 											if (braceStart !== -1) {
-												const jsonCandidate = scriptContent.substring(before.lastIndexOf("{"), Math.min(scriptContent.length, targetIndex + 1000));
-												const jsonMatch = jsonCandidate.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+												const jsonCandidate = scriptContent.substring(
+													before.lastIndexOf("{"),
+													Math.min(scriptContent.length, targetIndex + 1000),
+												);
+												const jsonMatch = jsonCandidate.match(
+													/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/,
+												);
 												if (jsonMatch) {
 													try {
 														const jsonObj = JSON.parse(jsonMatch[0]);
-														console.log(`  Contains JSON with target: ${JSON.stringify(jsonObj, null, 2).substring(0, 500)}...`);
+														console.log(
+															`  Contains JSON with target: ${JSON.stringify(jsonObj, null, 2).substring(0, 500)}...`,
+														);
 													} catch {
-														console.log(`  JSON-like structure: ${jsonMatch[0].substring(0, 300)}...`);
+														console.log(
+															`  JSON-like structure: ${jsonMatch[0].substring(0, 300)}...`,
+														);
 													}
 												} else {
-													console.log(`  Context around target: ...${before.substring(before.length - 100)}${after.substring(0, 100)}...`);
+													console.log(
+														`  Context around target: ...${before.substring(before.length - 100)}${after.substring(0, 100)}...`,
+													);
 												}
 											}
 										}

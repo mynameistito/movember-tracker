@@ -18,6 +18,7 @@ import {
 } from "../regex-patterns.js";
 import {
 	buildMovemberUrl,
+	buildTeamUrl,
 	extractSubdomainFromUrl,
 	fetchViaProxy,
 } from "./network.js";
@@ -149,7 +150,7 @@ export async function detectSubdomainForMember(
 ): Promise<string> {
 	// Check cache first (unless forcing refresh)
 	if (!forceRefresh) {
-		const cached = getCachedSubdomain(memberId);
+		const cached = getCachedSubdomain("member", memberId);
 		if (cached) {
 			logger.info(
 				"[SUBDOMAIN]",
@@ -172,7 +173,7 @@ export async function detectSubdomainForMember(
 			`Using manual override for memberId ${memberId}: ${subdomain}`,
 		);
 		// Cache the manual override
-		setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
+		setCachedSubdomain("member", memberId, subdomain, SUBDOMAIN_CACHE_TTL);
 		return subdomain;
 	}
 
@@ -223,7 +224,12 @@ export async function detectSubdomainForMember(
 						"[SUBDOMAIN]",
 						`URL redirected from ${subdomain} to ${actualSubdomain} for memberId ${memberId} (early exit)`,
 					);
-					setCachedSubdomain(memberId, actualSubdomain, SUBDOMAIN_CACHE_TTL);
+					setCachedSubdomain(
+						"member",
+						memberId,
+						actualSubdomain,
+						SUBDOMAIN_CACHE_TTL,
+					);
 					return actualSubdomain;
 				}
 
@@ -243,6 +249,7 @@ export async function detectSubdomainForMember(
 							`Found matching subdomain for memberId ${memberId}: ${confirmedSubdomain} (verified by currency, early exit)`,
 						);
 						setCachedSubdomain(
+							"member",
 							memberId,
 							confirmedSubdomain,
 							SUBDOMAIN_CACHE_TTL,
@@ -259,6 +266,7 @@ export async function detectSubdomainForMember(
 							`HTML currency indicates ${detectedSubdomain} (tested ${subdomain}, final URL: ${actualSubdomain || subdomain}), using detected subdomain (early exit)`,
 						);
 						setCachedSubdomain(
+							"member",
 							memberId,
 							detectedSubdomain,
 							SUBDOMAIN_CACHE_TTL,
@@ -292,7 +300,12 @@ export async function detectSubdomainForMember(
 				"[SUBDOMAIN]",
 				`Using fallback subdomain for memberId ${memberId}: ${fallbackSubdomain} (no currency match found)`,
 			);
-			setCachedSubdomain(memberId, fallbackSubdomain, SUBDOMAIN_CACHE_TTL);
+			setCachedSubdomain(
+				"member",
+				memberId,
+				fallbackSubdomain,
+				SUBDOMAIN_CACHE_TTL,
+			);
 			return fallbackSubdomain;
 		}
 
@@ -308,7 +321,12 @@ export async function detectSubdomainForMember(
 					"[SUBDOMAIN]",
 					`Using default subdomain for memberId ${memberId}: ${actualSubdomain}`,
 				);
-				setCachedSubdomain(memberId, actualSubdomain, SUBDOMAIN_CACHE_TTL);
+				setCachedSubdomain(
+					"member",
+					memberId,
+					actualSubdomain,
+					SUBDOMAIN_CACHE_TTL,
+				);
 				return actualSubdomain;
 			}
 		} catch (e) {
@@ -321,7 +339,12 @@ export async function detectSubdomainForMember(
 			"[SUBDOMAIN]",
 			`Could not find working subdomain for memberId ${memberId}, using default: ${DEFAULT_SUBDOMAIN}`,
 		);
-		setCachedSubdomain(memberId, DEFAULT_SUBDOMAIN, SUBDOMAIN_CACHE_TTL);
+		setCachedSubdomain(
+			"member",
+			memberId,
+			DEFAULT_SUBDOMAIN,
+			SUBDOMAIN_CACHE_TTL,
+		);
 		return DEFAULT_SUBDOMAIN;
 	} catch (error) {
 		// Track error with structured context
@@ -340,7 +363,12 @@ export async function detectSubdomainForMember(
 			`Failed to detect subdomain for memberId ${memberId}, using default:`,
 			error,
 		);
-		setCachedSubdomain(memberId, DEFAULT_SUBDOMAIN, SUBDOMAIN_CACHE_TTL);
+		setCachedSubdomain(
+			"member",
+			memberId,
+			DEFAULT_SUBDOMAIN,
+			SUBDOMAIN_CACHE_TTL,
+		);
 		return DEFAULT_SUBDOMAIN;
 	}
 }
@@ -358,4 +386,211 @@ export async function getSubdomainForMember(memberId: string): Promise<string> {
 
 	// Auto-detect (will check cache internally)
 	return await detectSubdomainForMember(memberId);
+}
+
+/**
+ * Detect subdomain by following redirects and checking HTML content for teams
+ * @param teamId - The team ID
+ * @param forceRefresh - Whether to force refresh (skip cache)
+ * @returns The detected subdomain
+ */
+export async function detectSubdomainForTeam(
+	teamId: string,
+	forceRefresh = false,
+): Promise<string> {
+	// Check cache first (unless forcing refresh)
+	if (!forceRefresh) {
+		const cached = getCachedSubdomain("team", teamId);
+		if (cached) {
+			logger.info(
+				"[SUBDOMAIN]",
+				`Found cached subdomain for teamId ${teamId}: ${cached}`,
+			);
+			return cached;
+		}
+	} else {
+		logger.info(
+			"[SUBDOMAIN]",
+			`Force refresh requested, skipping cache for teamId ${teamId}`,
+		);
+	}
+
+	// Try to detect by checking common subdomains and their HTML content
+	logger.info("[SUBDOMAIN]", `Detecting subdomain for teamId ${teamId}...`);
+	const commonSubdomains = [
+		"au", // Most common (default)
+		"uk", // Very common
+		"us", // Very common
+		"ca", // Common
+		"nz", // Common
+		"ie", // Common (EU)
+		"za", // Less common
+		"nl", // Less common (EU)
+		"de", // Less common (EU)
+		"fr", // Less common (EU)
+		"es", // Less common (EU)
+		"it", // Less common (EU)
+		"cz", // Rare
+		"dk", // Rare
+		"se", // Rare
+		"ex", // Rare (experimental)
+	];
+
+	try {
+		let fallbackSubdomain: string | null = null;
+
+		for (const subdomain of commonSubdomains) {
+			const testSubdomainUrl = buildTeamUrl(teamId, subdomain);
+			try {
+				const { html: testHtml, finalUrl } =
+					await fetchViaProxy(testSubdomainUrl);
+
+				// Extract actual subdomain from final URL (after redirects)
+				const actualSubdomain = extractSubdomainFromUrl(finalUrl);
+
+				// Early exit optimization: If we get a redirect to a valid subdomain, use it immediately
+				if (actualSubdomain && actualSubdomain !== subdomain) {
+					logger.info(
+						"[SUBDOMAIN]",
+						`URL redirected from ${subdomain} to ${actualSubdomain} for teamId ${teamId} (early exit)`,
+					);
+					setCachedSubdomain(
+						"team",
+						teamId,
+						actualSubdomain,
+						SUBDOMAIN_CACHE_TTL,
+					);
+					return actualSubdomain;
+				}
+
+				if (testHtml && testHtml.length > 1000) {
+					// Check HTML for currency indicators
+					const detectedSubdomain = detectSubdomainFromHtml(testHtml);
+
+					// Priority 1: If HTML currency check confirms the subdomain, use it (early exit)
+					if (
+						detectedSubdomain === subdomain ||
+						detectedSubdomain === actualSubdomain
+					) {
+						const confirmedSubdomain = actualSubdomain || subdomain;
+						logger.info(
+							"[SUBDOMAIN]",
+							`Found matching subdomain for teamId ${teamId}: ${confirmedSubdomain} (verified by currency, early exit)`,
+						);
+						setCachedSubdomain(
+							"team",
+							teamId,
+							confirmedSubdomain,
+							SUBDOMAIN_CACHE_TTL,
+						);
+						return confirmedSubdomain;
+					} else if (
+						detectedSubdomain &&
+						detectedSubdomain !== subdomain &&
+						detectedSubdomain !== actualSubdomain
+					) {
+						logger.info(
+							"[SUBDOMAIN]",
+							`HTML currency indicates ${detectedSubdomain} (tested ${subdomain}, final URL: ${actualSubdomain || subdomain}), using detected subdomain (early exit)`,
+						);
+						setCachedSubdomain(
+							"team",
+							teamId,
+							detectedSubdomain,
+							SUBDOMAIN_CACHE_TTL,
+						);
+						return detectedSubdomain;
+					} else {
+						const fallbackSubdomainToUse = actualSubdomain || subdomain;
+						if (!fallbackSubdomain) {
+							fallbackSubdomain = fallbackSubdomainToUse;
+							logger.info(
+								"[SUBDOMAIN]",
+								`Found valid HTML for subdomain ${fallbackSubdomainToUse} (currency check inconclusive, storing as fallback)`,
+							);
+						}
+					}
+				}
+			} catch (e) {
+				const error = e instanceof Error ? e : new Error(String(e));
+				if (error.message && !error.message.includes("404")) {
+					logger.warn("[SUBDOMAIN]", `Error trying subdomain ${subdomain}:`, e);
+				}
+			}
+		}
+
+		// If we found a fallback subdomain (valid HTML but inconclusive currency), use it
+		if (fallbackSubdomain) {
+			logger.info(
+				"[SUBDOMAIN]",
+				`Using fallback subdomain for teamId ${teamId}: ${fallbackSubdomain} (no currency match found)`,
+			);
+			setCachedSubdomain(
+				"team",
+				teamId,
+				fallbackSubdomain,
+				SUBDOMAIN_CACHE_TTL,
+			);
+			return fallbackSubdomain;
+		}
+
+		// If we couldn't determine by currency, try default subdomain
+		const testUrl = buildTeamUrl(teamId, DEFAULT_SUBDOMAIN);
+		try {
+			const { html, finalUrl } = await fetchViaProxy(testUrl);
+			if (html && html.length > 1000) {
+				const actualSubdomain =
+					extractSubdomainFromUrl(finalUrl) || DEFAULT_SUBDOMAIN;
+				logger.info(
+					"[SUBDOMAIN]",
+					`Using default subdomain for teamId ${teamId}: ${actualSubdomain}`,
+				);
+				setCachedSubdomain(
+					"team",
+					teamId,
+					actualSubdomain,
+					SUBDOMAIN_CACHE_TTL,
+				);
+				return actualSubdomain;
+			}
+		} catch (e) {
+			logger.warn("[SUBDOMAIN]", "Error trying default subdomain:", e);
+		}
+
+		// Fallback to default
+		logger.warn(
+			"[SUBDOMAIN]",
+			`Could not find working subdomain for teamId ${teamId}, using default: ${DEFAULT_SUBDOMAIN}`,
+		);
+		setCachedSubdomain("team", teamId, DEFAULT_SUBDOMAIN, SUBDOMAIN_CACHE_TTL);
+		return DEFAULT_SUBDOMAIN;
+	} catch (error) {
+		trackSubdomainError(
+			error instanceof Error ? error : new Error(String(error)),
+			{
+				memberId: teamId,
+				metadata: {
+					timestamp: Date.now(),
+				},
+			},
+		);
+
+		logger.warn(
+			"[SUBDOMAIN]",
+			`Failed to detect subdomain for teamId ${teamId}, using default:`,
+			error,
+		);
+		setCachedSubdomain("team", teamId, DEFAULT_SUBDOMAIN, SUBDOMAIN_CACHE_TTL);
+		return DEFAULT_SUBDOMAIN;
+	}
+}
+
+/**
+ * Get subdomain for a team ID (with auto-detection)
+ * @param teamId - The team ID
+ * @returns The subdomain for the team
+ */
+export async function getSubdomainForTeam(teamId: string): Promise<string> {
+	// Auto-detect (will check cache internally)
+	return await detectSubdomainForTeam(teamId);
 }

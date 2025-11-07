@@ -26,13 +26,16 @@ import { calculatePercentage, isValidNumber, parseAmount } from "../parsing.js";
 import { extractAmounts } from "./html-parsing.js";
 import {
 	buildMovemberUrl,
+	buildTeamUrl,
 	extractSubdomainFromUrl,
 	fetchViaProxy,
 } from "./network.js";
 import {
 	detectSubdomainForMember,
+	detectSubdomainForTeam,
 	detectSubdomainFromHtml,
 	getSubdomainForMember,
+	getSubdomainForTeam,
 } from "./subdomain.js";
 
 export interface ScrapedData extends CachedData {
@@ -90,7 +93,7 @@ export async function scrapeMovemberPage(
 					"[SCRAPE]",
 					`Got 404 for ${movemberUrl}, clearing cached subdomain and re-detecting...`,
 				);
-				clearSubdomainCache(memberId);
+				clearSubdomainCache("member", memberId);
 				// Re-detect subdomain with force refresh
 				const newSubdomain = await detectSubdomainForMember(memberId, true);
 				if (newSubdomain !== subdomain) {
@@ -129,7 +132,7 @@ export async function scrapeMovemberPage(
 			);
 			subdomain = actualSubdomain;
 			// Update cache with correct subdomain
-			setCachedSubdomain(memberId, subdomain, SUBDOMAIN_CACHE_TTL);
+			setCachedSubdomain("member", memberId, subdomain, SUBDOMAIN_CACHE_TTL);
 		}
 
 		// Verify subdomain by checking HTML content for currency indicators (optional verification only)
@@ -314,7 +317,7 @@ export async function scrapeWithRetry(memberId: string): Promise<ScrapedData> {
 					"[RETRY]",
 					`404 detected, clearing subdomain cache for memberId: ${memberId}`,
 				);
-				clearSubdomainCache(memberId);
+				clearSubdomainCache("member", memberId);
 			}
 
 			if (attempt < MAX_RETRIES - 1) {
@@ -367,12 +370,12 @@ export async function getData(
 			"[CACHE]",
 			`Storing live data in cache with TTL: ${CACHE_TTL}ms for memberId: ${memberId}`,
 		);
-		setCachedData(memberId, data, CACHE_TTL);
+		setCachedData("member", memberId, data, CACHE_TTL);
 		logger.info("[CACHE]", "Live data stored successfully");
 	} else {
 		// Check cache first (fresh data)
 		logger.info("[CACHE]", `Checking cache for memberId: ${memberId}`);
-		data = getCachedData(memberId);
+		data = getCachedData("member", memberId);
 
 		if (data) {
 			const cacheAge = Date.now() - data.timestamp;
@@ -387,8 +390,8 @@ export async function getData(
 			);
 		} else {
 			// Check for stale data (stale-while-revalidate pattern)
-			const staleData = getStaleCachedData(memberId);
-			const isStale = isCachedDataStale(memberId);
+			const staleData = getStaleCachedData("member", memberId);
+			const isStale = isCachedDataStale("member", memberId);
 
 			if (staleData && isStale) {
 				// Return stale data immediately (stale-while-revalidate)
@@ -407,7 +410,7 @@ export async function getData(
 							"[CACHE]",
 							`Background refresh completed for memberId: ${memberId}, updating cache`,
 						);
-						setCachedData(memberId, freshData, CACHE_TTL);
+						setCachedData("member", memberId, freshData, CACHE_TTL);
 					})
 					.catch((error) => {
 						logger.error(
@@ -430,7 +433,7 @@ export async function getData(
 					"[CACHE]",
 					`Storing data in cache with TTL: ${CACHE_TTL}ms for memberId: ${memberId}`,
 				);
-				setCachedData(memberId, data, CACHE_TTL);
+				setCachedData("member", memberId, data, CACHE_TTL);
 				logger.info("[CACHE]", "Data stored successfully");
 			}
 		}
@@ -441,6 +444,406 @@ export async function getData(
 	if (!data) {
 		throw new Error(
 			`Unexpected null data for memberId: ${memberId}. This should never happen.`,
+		);
+	}
+
+	return { data, cacheStatus };
+}
+
+/**
+ * Scrape the Movember team page using Worker's CORS proxy and HTML parsing
+ * @param teamId - The team ID to scrape
+ * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
+ * @returns The scraped data
+ * @throws If scraping fails
+ */
+export async function scrapeTeamPage(
+	teamId: string,
+	clearSubdomainOn404 = false,
+): Promise<ScrapedData> {
+	let subdomain = await getSubdomainForTeam(teamId);
+	const teamUrl = buildTeamUrl(teamId, subdomain);
+	const startTime = Date.now();
+	logger.info(
+		"[SCRAPE]",
+		`Starting scrape of Movember team page: ${teamUrl} (subdomain: ${subdomain})`,
+	);
+
+	try {
+		// Fetch the HTML via Worker's CORS proxy
+		logger.info("[SCRAPE]", `Fetching HTML from ${teamUrl} via proxy...`);
+		const fetchStart = Date.now();
+		let html: string;
+		let finalUrl: string;
+
+		try {
+			const result = await fetchViaProxy(teamUrl);
+			html = result.html;
+			finalUrl = result.finalUrl;
+		} catch (error) {
+			// If we get an error, try clearing subdomain cache and re-detecting
+			if (
+				clearSubdomainOn404 &&
+				error instanceof Error &&
+				error.message.includes("404")
+			) {
+				logger.warn(
+					"[SCRAPE]",
+					`Got 404 for ${teamUrl}, clearing cached subdomain and re-detecting...`,
+				);
+				clearSubdomainCache("team", teamId);
+				// Re-detect subdomain with force refresh
+				const newSubdomain = await detectSubdomainForTeam(teamId, true);
+				if (newSubdomain !== subdomain) {
+					logger.info(
+						"[SCRAPE]",
+						`Re-detected subdomain: ${newSubdomain} (was ${subdomain}), retrying with new subdomain...`,
+					);
+					// Retry with new subdomain
+					const newUrl = buildTeamUrl(teamId, newSubdomain);
+					const retryResult = await fetchViaProxy(newUrl);
+					html = retryResult.html;
+					finalUrl = retryResult.finalUrl;
+					subdomain = newSubdomain;
+				} else {
+					throw new Error(
+						`HTTP error! status: 404 (page not found - team may not exist)`,
+					);
+				}
+			} else {
+				throw error;
+			}
+		}
+
+		const fetchDuration = Date.now() - fetchStart;
+		logger.info(
+			"[SCRAPE]",
+			`HTML fetched successfully in ${formatDuration(fetchDuration)} (${html.length} characters)`,
+		);
+
+		// Check if URL redirected to a different subdomain
+		const actualSubdomain = extractSubdomainFromUrl(finalUrl);
+		if (actualSubdomain && actualSubdomain !== subdomain) {
+			logger.info(
+				"[SCRAPE]",
+				`URL redirected from ${subdomain} to ${actualSubdomain}, updating subdomain...`,
+			);
+			subdomain = actualSubdomain;
+			// Update cache with correct subdomain
+			setCachedSubdomain("team", teamId, subdomain, SUBDOMAIN_CACHE_TTL);
+		}
+
+		// Verify subdomain by checking HTML content for currency indicators (optional verification only)
+		const htmlDetectedSubdomain = detectSubdomainFromHtml(html);
+		if (htmlDetectedSubdomain && htmlDetectedSubdomain !== subdomain) {
+			logger.warn(
+				"[SCRAPE]",
+				`HTML currency indicates subdomain ${htmlDetectedSubdomain} but URL subdomain is ${subdomain}. Trusting URL subdomain (primary source).`,
+			);
+			// Don't override - trust the URL subdomain we're using
+		} else if (htmlDetectedSubdomain === subdomain) {
+			logger.info(
+				"[SCRAPE]",
+				`HTML currency verification confirms subdomain ${subdomain}`,
+			);
+		}
+
+		// Extract data from HTML
+		const { raised, target } = extractAmounts(html, teamId, subdomain);
+
+		// Final validation check - ensure raised is actually valid before using
+		if (!raised || !isValidNumber(raised)) {
+			// Debug: Try to find any dollar amounts in the HTML to help diagnose
+			const allDollarAmounts = html.match(/\$[\d,]+(?:\.\d+)?/g);
+			logger.warn(
+				"[SCRAPE]",
+				`Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML:`,
+				allDollarAmounts ? allDollarAmounts.slice(0, 10) : [],
+			); // Show first 10
+
+			// Try to find any numbers that might be amounts
+			const potentialAmounts = html.match(/[\d,]{3,}(?:\.\d+)?/g);
+			logger.warn(
+				"[SCRAPE]",
+				`Found ${potentialAmounts ? potentialAmounts.length : 0} potential amount numbers in HTML (showing first 20):`,
+				potentialAmounts ? potentialAmounts.slice(0, 20) : [],
+			);
+
+			const errorDetails = {
+				teamId,
+				subdomain,
+				url: teamUrl,
+				message:
+					"Could not find raised amount in HTML. The page may require JavaScript execution or the HTML structure may have changed.",
+				htmlLength: html.length,
+				dollarAmountsFound: allDollarAmounts ? allDollarAmounts.length : 0,
+				raisedValue: raised || "empty",
+			};
+			logger.error(
+				"[SCRAPE]",
+				"Failed to extract raised amount:",
+				errorDetails,
+			);
+			throw new Error(
+				`Could not find raised amount in HTML for teamId ${teamId} (subdomain: ${subdomain}). The page may require JavaScript execution or the HTML structure may have changed. Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML.`,
+			);
+		}
+
+		// Double-check that raised is valid before parsing
+		if (!isValidNumber(raised)) {
+			throw new Error(
+				`Invalid raised value captured: "${raised}" for teamId ${teamId}`,
+			);
+		}
+
+		// Parse amount with subdomain to determine correct currency
+		const { value: raisedValue, currency } = parseAmount(
+			`$${raised}`,
+			subdomain,
+		);
+
+		// Validate the parsed value is not empty or zero (unless it's actually zero)
+		if (!raisedValue || raisedValue === "0" || raisedValue === "") {
+			logger.warn(
+				"[SCRAPE]",
+				`Parsed raised value is invalid: "${raisedValue}" from input: "${raised}"`,
+			);
+		}
+
+		// Format amount with appropriate currency symbol
+		const currencySymbol = getCurrencySymbol(currency);
+		const raisedFormatted = `${currencySymbol}${raisedValue}`;
+
+		const result: ScrapedData = {
+			amount: raisedFormatted,
+			currency,
+			subdomain, // Include subdomain in result for consolidated cache
+			timestamp: Date.now(),
+		};
+
+		if (target && isValidNumber(target)) {
+			const { value: targetValue } = parseAmount(`$${target}`, subdomain);
+			// Use the same currency symbol for consistency
+			const targetFormatted = `${currencySymbol}${targetValue}`;
+			result.target = targetFormatted;
+			result.percentage = calculatePercentage(raisedValue, targetValue);
+		} else if (target) {
+			logger.warn(
+				"[SCRAPE]",
+				`Target value "${target}" failed validation, skipping target`,
+			);
+		}
+
+		const totalDuration = Date.now() - startTime;
+		logger.info(
+			"[SCRAPE]",
+			`Scraping completed successfully in ${formatDuration(totalDuration)}:`,
+			{
+				amount: result.amount,
+				target: result.target,
+				percentage: result.percentage,
+				currency: result.currency,
+				subdomain: result.subdomain,
+			},
+		);
+
+		return result;
+	} catch (error) {
+		const totalDuration = Date.now() - startTime;
+		const errorMessage = error instanceof Error ? error.message : String(error);
+
+		// Track error with structured context
+		trackScrapingError(
+			error instanceof Error ? error : new Error(errorMessage),
+			{
+				memberId: teamId,
+				subdomain,
+				url: teamUrl,
+				metadata: {
+					duration: totalDuration,
+					timestamp: Date.now(),
+				},
+			},
+		);
+
+		logger.error(
+			"[SCRAPE]",
+			`Scraping failed after ${formatDuration(totalDuration)}:`,
+			errorMessage,
+			error,
+		);
+		throw error;
+	}
+}
+
+/**
+ * Retry wrapper with exponential backoff for teams
+ * @param teamId - The team ID to scrape
+ * @returns The scraped data
+ * @throws If all retries fail
+ */
+export async function scrapeTeamWithRetry(
+	teamId: string,
+): Promise<ScrapedData> {
+	let lastError: Error | null = null;
+	const retryStartTime = Date.now();
+
+	logger.info(
+		"[RETRY]",
+		`Starting retry logic (max ${MAX_RETRIES} attempts) for teamId: ${teamId}`,
+	);
+
+	for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+		try {
+			logger.info("[RETRY]", `Attempt ${attempt + 1}/${MAX_RETRIES}`);
+			// Enable subdomain clearing on 404 for retries (especially on first attempt)
+			const clearSubdomainOn404 =
+				attempt === 0 || lastError?.message.includes("404");
+			const result = await scrapeTeamPage(teamId, clearSubdomainOn404);
+			const totalDuration = Date.now() - retryStartTime;
+			logger.info(
+				"[RETRY]",
+				`Success on attempt ${attempt + 1} after ${totalDuration}ms`,
+			);
+			return result;
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+			const errorMessage = lastError.message;
+			logger.error("[RETRY]", `Attempt ${attempt + 1} failed:`, errorMessage);
+
+			// If we got a 404, clear the subdomain cache before retrying
+			if (errorMessage.includes("404")) {
+				logger.info(
+					"[RETRY]",
+					`404 detected, clearing subdomain cache for teamId: ${teamId}`,
+				);
+				clearSubdomainCache("team", teamId);
+			}
+
+			if (attempt < MAX_RETRIES - 1) {
+				const delay =
+					RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+				logger.info(
+					"[RETRY]",
+					`Waiting ${delay}ms before retry ${attempt + 2}...`,
+				);
+				await sleep(delay);
+			} else {
+				const totalDuration = Date.now() - retryStartTime;
+				logger.error(
+					"[RETRY]",
+					`All ${MAX_RETRIES} attempts failed after ${totalDuration}ms`,
+				);
+			}
+		}
+	}
+
+	throw lastError || new Error("Failed to scrape after all retries");
+}
+
+/**
+ * Main function to get team data (with stale-while-revalidate caching)
+ * Implements stale-while-revalidate pattern: returns stale data immediately if available,
+ * then fetches fresh data in the background and updates cache
+ * @param teamId - The team ID to get data for
+ * @param grabLive - Whether to force a fresh scrape (bypass cache)
+ * @returns The data and cache status
+ */
+export async function getTeamData(
+	teamId: string,
+	grabLive = false,
+): Promise<GetDataResult> {
+	let data: ScrapedData | null = null;
+	let cacheStatus: GetDataResult["cacheStatus"] = "HIT";
+
+	if (grabLive) {
+		// Force fresh scrape, bypass cache
+		logger.info(
+			"[LIVE]",
+			`grab-live parameter detected - forcing fresh scrape for teamId: ${teamId}`,
+		);
+		data = await scrapeTeamWithRetry(teamId);
+		cacheStatus = "LIVE";
+
+		// Store in cache with 5-minute TTL
+		logger.info(
+			"[CACHE]",
+			`Storing live data in cache with TTL: ${CACHE_TTL}ms for teamId: ${teamId}`,
+		);
+		setCachedData("team", teamId, data, CACHE_TTL);
+		logger.info("[CACHE]", "Live data stored successfully");
+	} else {
+		// Check cache first (fresh data)
+		logger.info("[CACHE]", `Checking cache for teamId: ${teamId}`);
+		data = getCachedData("team", teamId);
+
+		if (data) {
+			const cacheAge = Date.now() - data.timestamp;
+			logger.info(
+				"[CACHE]",
+				`Cache HIT - data age: ${Math.round(cacheAge / 1000)}s for teamId: ${teamId}`,
+				{
+					amount: data.amount,
+					target: data.target,
+					timestamp: new Date(data.timestamp).toISOString(),
+				},
+			);
+		} else {
+			// Check for stale data (stale-while-revalidate pattern)
+			const staleData = getStaleCachedData("team", teamId);
+			const isStale = isCachedDataStale("team", teamId);
+
+			if (staleData && isStale) {
+				// Return stale data immediately (stale-while-revalidate)
+				logger.info(
+					"[CACHE]",
+					`Cache STALE - returning stale data immediately, fetching fresh data in background for teamId: ${teamId}`,
+				);
+				data = staleData;
+				cacheStatus = "STALE";
+
+				// Fetch fresh data in background (don't await)
+				// This updates the cache for the next request
+				scrapeTeamWithRetry(teamId)
+					.then((freshData) => {
+						logger.info(
+							"[CACHE]",
+							`Background refresh completed for teamId: ${teamId}, updating cache`,
+						);
+						setCachedData("team", teamId, freshData, CACHE_TTL);
+					})
+					.catch((error) => {
+						logger.error(
+							"[CACHE]",
+							`Background refresh failed for teamId: ${teamId}:`,
+							error,
+						);
+					});
+			} else {
+				// No cache at all, need to scrape
+				logger.info(
+					"[CACHE]",
+					`Cache MISS - need to scrape for teamId: ${teamId}`,
+				);
+				data = await scrapeTeamWithRetry(teamId);
+				cacheStatus = "MISS";
+
+				// Store in cache with 5-minute TTL
+				logger.info(
+					"[CACHE]",
+					`Storing data in cache with TTL: ${CACHE_TTL}ms for teamId: ${teamId}`,
+				);
+				setCachedData("team", teamId, data, CACHE_TTL);
+				logger.info("[CACHE]", "Data stored successfully");
+			}
+		}
+	}
+
+	// Type guard: data should never be null at this point, but TypeScript can't guarantee it
+	// This is a safety check in case of unexpected code paths
+	if (!data) {
+		throw new Error(
+			`Unexpected null data for teamId: ${teamId}. This should never happen.`,
 		);
 	}
 

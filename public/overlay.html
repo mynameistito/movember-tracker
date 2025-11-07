@@ -22,7 +22,7 @@
     </div>
   </div>
   <script type="module">
-    import { DEFAULT_MEMBER_ID, getData } from './js/bundle.js';
+    import { DEFAULT_MEMBER_ID, getData, getTeamData } from './js/bundle.js';
 
     const amountElement = document.getElementById('amount');
     const targetElement = document.getElementById('target');
@@ -33,9 +33,10 @@
       percentage: 0
     };
     
-    // Get memberId from URL query parameters
+    // Get memberId or teamId from URL query parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || DEFAULT_MEMBER_ID;
+    const teamId = urlParams.get('teamId') || urlParams.get('teamid');
+    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || (teamId ? null : DEFAULT_MEMBER_ID);
     
     // Parse interval from URL query parameter (in seconds), default to 300 seconds (5 minutes)
     const intervalParam = urlParams.get('interval');
@@ -57,7 +58,9 @@
           lastFreshFetchTime = now;
         }
         
-        const { data } = await getData(memberId, grabLive);
+        const { data } = teamId
+          ? await getTeamData(teamId, grabLive)
+          : await getData(memberId, grabLive);
         
         if (data.amount && (data.amount !== currentData.amount || data.target !== currentData.target)) {
           amountElement.classList.add('opacity-70');

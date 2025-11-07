@@ -35,8 +35,8 @@ function extractRaisedAmountWithDOMParser(html: string): string {
 		// Prioritize team page selectors first, then member page selectors
 		const selectors = [
 			// Team page selectors
-			"h1.mospace-heroarea--donations-target-amount-number",
-			'h1[class*="mospace-heroarea--donations-target-amount-number"]',
+			"div.mospace-heroarea--donations-target-amount-wrapper > h1",
+			"div.mospace-heroarea--donations-target-amount-wrapper h1",
 			// Member page selectors
 			"span.donationProgress--amount__raised",
 			"span[class*='donationProgress--amount__raised']",
@@ -330,8 +330,8 @@ function extractTargetAmountWithDOMParser(html: string): string {
 		// Prioritize team page selectors first, then member page selectors
 		const selectors = [
 			// Team page selectors
-			"div#mospace-heroarea--donations-target-text",
-			'div[id*="mospace-heroarea--donations-target-text"]',
+			"#mospace-heroarea--donations-target-text",
+			'[id*="mospace-heroarea--donations-target-text"]',
 			// Member page selectors
 			"span.donationProgress--amount__target",
 			"span[class*='donationProgress--amount__target']",

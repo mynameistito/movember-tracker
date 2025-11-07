@@ -126,6 +126,13 @@
       <div class="flex flex-wrap gap-3 mb-5">
         <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="fetchButton" onclick="fetchData()">Fetch Data</button>
         <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="refreshButton" onclick="fetchData(true)">Force Refresh</button>
+        <label for="overlayLocation" class="flex items-center gap-2 text-gray-300 font-medium">Position:</label>
+        <select id="overlayLocation" class="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-base font-inherit focus:outline-none focus:border-green-500 transition-colors">
+          <option value="bottomright">Bottom Right</option>
+          <option value="bottomleft">Bottom Left</option>
+          <option value="topright">Top Right</option>
+          <option value="topleft">Top Left</option>
+        </select>
         <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="copyOverlayButton" onclick="copyOverlayUrl()">Copy Overlay URL</button>
       </div>
       <div id="dataDisplay"></div>
@@ -182,10 +189,22 @@
       <p class="text-gray-300 mb-4 text-base">
         Use <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId</code> for member pages or <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">teamId</code> for team pages:
       </p>
-      <ul class="list-none pl-0">
+      <ul class="list-none pl-0 mb-4">
         <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/overlay?memberId=12345678</code> - Member overlay</li>
         <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/overlay?teamId=2494795</code> - Team overlay</li>
       </ul>
+      <p class="text-gray-300 mb-4 text-base">
+        You can also specify the overlay position using the <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location</code> parameter. Valid values are:
+      </p>
+      <ul class="list-none pl-0">
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=bottomright</code> - Bottom right corner (default)</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=bottomleft</code> - Bottom left corner</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=topright</code> - Top right corner</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=topleft</code> - Top left corner</li>
+      </ul>
+      <p class="text-gray-300 mb-4 text-base">
+        Example: <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/overlay?memberId=12345678&location=topright</code>
+      </p>
     </section>
 
     <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
@@ -297,7 +316,9 @@
       const pageType = getPageType();
       const id = getId();
       const paramName = pageType === 'team' ? 'teamId' : 'memberId';
-      const overlayUrl = `${baseUrl}/overlay?${paramName}=${id}`;
+      const locationSelect = document.getElementById('overlayLocation');
+      const location = locationSelect ? locationSelect.value : 'bottomright';
+      const overlayUrl = `${baseUrl}/overlay?${paramName}=${id}&location=${location}`;
       const copyButton = document.getElementById('copyOverlayButton');
       const originalText = copyButton.textContent;
 

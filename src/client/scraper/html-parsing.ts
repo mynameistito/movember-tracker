@@ -32,7 +32,10 @@ function extractRaisedAmountWithDOMParser(html: string): string {
 		const doc = parser.parseFromString(html, "text/html");
 
 		// Try to find elements with donation-related classes
+		// Prioritize span elements with the exact class names
 		const selectors = [
+			"span.donationProgress--amount__raised",
+			"span[class*='donationProgress--amount__raised']",
 			".donationProgress--amount__raised",
 			'[class*="donationProgress--amount__raised"]',
 			'[class*="raised"]',
@@ -320,7 +323,10 @@ function extractTargetAmountWithDOMParser(html: string): string {
 		const doc = parser.parseFromString(html, "text/html");
 
 		// Try to find elements with target-related classes
+		// Prioritize span elements with the exact class names
 		const selectors = [
+			"span.donationProgress--amount__target",
+			"span[class*='donationProgress--amount__target']",
 			".donationProgress--amount__target",
 			'[class*="donationProgress--amount__target"]',
 			'[class*="target"]',

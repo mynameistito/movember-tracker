@@ -83,17 +83,21 @@ export const TARGET_PATTERNS: RegExp[] = [
 
 // JSON script tag patterns for raised amounts (optimized with combined patterns)
 export const RAISED_JSON_PATTERNS: RegExp[] = [
-	// Combined JSON property patterns
+	// Pattern 1: AmountRaised object with originalAmount or convertedAmount (most reliable)
+	/"AmountRaised"[^}]*"(?:convertedAmount|originalAmount)"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
+	// Pattern 2: Combined JSON property patterns
 	/"(?:raised|raisedAmount|currentAmount|donationAmount|amount)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Unquoted property pattern (separate due to different structure)
+	// Pattern 3: Unquoted property pattern (separate due to different structure)
 	/raised[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
 ];
 
 // JSON script tag patterns for target amounts (optimized with combined patterns)
 export const TARGET_JSON_PATTERNS: RegExp[] = [
-	// Combined JSON property patterns
+	// Pattern 1: target.fundraising.value (most reliable)
+	/"target"[^}]*"fundraising"[^}]*"value"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
+	// Pattern 2: Combined JSON property patterns
 	/"(?:target|targetAmount|goal)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
-	// Unquoted property patterns - combined
+	// Pattern 3: Unquoted property patterns - combined
 	/(?:target|goal)[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
 ];
 

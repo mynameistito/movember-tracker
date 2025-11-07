@@ -6,6 +6,8 @@
 import {
 	clearSubdomainCache,
 	getCachedData,
+	getStaleCachedData,
+	isCachedDataStale,
 	setCachedData,
 	setCachedSubdomain,
 } from "../cache.js";
@@ -16,6 +18,7 @@ import {
 	RETRY_DELAYS,
 	SUBDOMAIN_CACHE_TTL,
 } from "../constants.js";
+import { trackScrapingError } from "../error-tracking.js";
 import { formatDuration, sleep } from "../formatting.js";
 import logger from "../logger.js";
 import { calculatePercentage, isValidNumber, parseAmount } from "../parsing.js";
@@ -228,6 +231,18 @@ export async function scrapeMovemberPage(
 	} catch (error) {
 		const totalDuration = Date.now() - startTime;
 		const errorMessage = error instanceof Error ? error.message : String(error);
+
+		// Track error with structured context
+		trackScrapingError(error, {
+			memberId,
+			subdomain,
+			url: movemberUrl,
+			metadata: {
+				duration: totalDuration,
+				timestamp: Date.now(),
+			},
+		});
+
 		logger.error(
 			"[SCRAPE]",
 			`Scraping failed after ${formatDuration(totalDuration)}:`,
@@ -302,7 +317,9 @@ export async function scrapeWithRetry(memberId) {
 }
 
 /**
- * Main function to get data (with caching)
+ * Main function to get data (with stale-while-revalidate caching)
+ * Implements stale-while-revalidate pattern: returns stale data immediately if available,
+ * then fetches fresh data in the background and updates cache
  * @param {string} memberId - The member ID to get data for
  * @param {boolean} grabLive - Whether to force a fresh scrape (bypass cache)
  * @returns {Promise<{data: {amount: string, currency: string, subdomain: string, timestamp: number, target?: string, percentage?: number}, cacheStatus: string}>} The data and cache status
@@ -328,7 +345,7 @@ export async function getData(memberId, grabLive = false) {
 		setCachedData(memberId, data, CACHE_TTL);
 		logger.info("[CACHE]", "Live data stored successfully");
 	} else {
-		// Check cache first
+		// Check cache first (fresh data)
 		logger.info("[CACHE]", `Checking cache for memberId: ${memberId}`);
 		data = getCachedData(memberId);
 
@@ -344,24 +361,53 @@ export async function getData(memberId, grabLive = false) {
 				},
 			);
 		} else {
-			logger.info(
-				"[CACHE]",
-				`Cache MISS - need to scrape for memberId: ${memberId}`,
-			);
-		}
+			// Check for stale data (stale-while-revalidate pattern)
+			const staleData = getStaleCachedData(memberId);
+			const isStale = isCachedDataStale(memberId);
 
-		// If cache miss, scrape the page
-		if (!data) {
-			data = await scrapeWithRetry(memberId);
-			cacheStatus = "MISS";
+			if (staleData && isStale) {
+				// Return stale data immediately (stale-while-revalidate)
+				logger.info(
+					"[CACHE]",
+					`Cache STALE - returning stale data immediately, fetching fresh data in background for memberId: ${memberId}`,
+				);
+				data = staleData;
+				cacheStatus = "STALE";
 
-			// Store in cache with 5-minute TTL
-			logger.info(
-				"[CACHE]",
-				`Storing data in cache with TTL: ${CACHE_TTL}ms for memberId: ${memberId}`,
-			);
-			setCachedData(memberId, data, CACHE_TTL);
-			logger.info("[CACHE]", "Data stored successfully");
+				// Fetch fresh data in background (don't await)
+				// This updates the cache for the next request
+				scrapeWithRetry(memberId)
+					.then((freshData) => {
+						logger.info(
+							"[CACHE]",
+							`Background refresh completed for memberId: ${memberId}, updating cache`,
+						);
+						setCachedData(memberId, freshData, CACHE_TTL);
+					})
+					.catch((error) => {
+						logger.error(
+							"[CACHE]",
+							`Background refresh failed for memberId: ${memberId}:`,
+							error,
+						);
+					});
+			} else {
+				// No cache at all, need to scrape
+				logger.info(
+					"[CACHE]",
+					`Cache MISS - need to scrape for memberId: ${memberId}`,
+				);
+				data = await scrapeWithRetry(memberId);
+				cacheStatus = "MISS";
+
+				// Store in cache with 5-minute TTL
+				logger.info(
+					"[CACHE]",
+					`Storing data in cache with TTL: ${CACHE_TTL}ms for memberId: ${memberId}`,
+				);
+				setCachedData(memberId, data, CACHE_TTL);
+				logger.info("[CACHE]", "Data stored successfully");
+			}
 		}
 	}
 

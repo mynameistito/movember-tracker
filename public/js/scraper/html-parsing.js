@@ -16,12 +16,103 @@ import {
 } from "../regex-patterns.js";
 
 /**
+ * Extract raised amount from HTML using DOMParser (primary method)
+ * Falls back to regex if DOMParser fails or doesn't find results
+ * @param {string} html - The HTML content to parse
+ * @returns {string} The extracted raised amount or empty string if not found
+ */
+function extractRaisedAmountWithDOMParser(html) {
+	try {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(html, "text/html");
+
+		// Try to find elements with donation-related classes
+		const selectors = [
+			".donationProgress--amount__raised",
+			'[class*="donationProgress--amount__raised"]',
+			'[class*="raised"]',
+			"[data-raised]",
+			"[data-amount]",
+			"[data-raised-amount]",
+		];
+
+		for (const selector of selectors) {
+			const elements = doc.querySelectorAll(selector);
+			for (const element of elements) {
+				const text = element.textContent || element.innerText || "";
+				// Try to extract amount from text
+				const amountMatch = text.match(/[\d,]+(?:\.\d+)?/);
+				if (amountMatch && isValidNumber(amountMatch[0])) {
+					logger.info(
+						"[SCRAPE]",
+						`Found raised amount using DOMParser with selector "${selector}": ${amountMatch[0]}`,
+					);
+					return amountMatch[0];
+				}
+
+				// Try data attributes
+				const dataRaised =
+					element.getAttribute("data-raised") ||
+					element.getAttribute("data-amount") ||
+					element.getAttribute("data-raised-amount");
+				if (dataRaised && isValidNumber(dataRaised)) {
+					logger.info(
+						"[SCRAPE]",
+						`Found raised amount using DOMParser data attribute: ${dataRaised}`,
+					);
+					return dataRaised;
+				}
+			}
+		}
+
+		// Try to find JSON data in script tags using DOMParser
+		const scriptTags = doc.querySelectorAll("script");
+		for (const script of scriptTags) {
+			const scriptContent = script.textContent || script.innerHTML || "";
+			for (let i = 0; i < RAISED_JSON_PATTERNS.length; i++) {
+				const pattern = RAISED_JSON_PATTERNS[i];
+				const match = scriptContent.match(pattern);
+				if (match) {
+					const captured = match[1];
+					if (isValidNumber(captured)) {
+						logger.info(
+							"[SCRAPE]",
+							`Found raised amount in JSON using DOMParser: ${captured}`,
+						);
+						return captured;
+					}
+				}
+			}
+		}
+	} catch (error) {
+		logger.warn(
+			"[SCRAPE]",
+			"DOMParser extraction failed, falling back to regex:",
+			error,
+		);
+	}
+
+	return "";
+}
+
+/**
  * Extract raised amount from HTML using multiple pattern strategies
+ * Tries DOMParser first, then falls back to regex patterns
  * @param {string} html - The HTML content to parse
  * @returns {string} The extracted raised amount or empty string if not found
  */
 export function extractRaisedAmount(html) {
-	let raised = "";
+	// Try DOMParser first (more reliable for structured HTML)
+	let raised = extractRaisedAmountWithDOMParser(html);
+	if (raised) {
+		return raised;
+	}
+
+	logger.info(
+		"[SCRAPE]",
+		"DOMParser didn't find raised amount, trying regex patterns...",
+	);
+	raised = "";
 
 	// Look for the raised amount in the HTML
 	// Try multiple patterns to find the data
@@ -207,12 +298,104 @@ export function extractRaisedAmount(html) {
 }
 
 /**
+ * Extract target amount from HTML using DOMParser (primary method)
+ * Falls back to regex if DOMParser fails or doesn't find results
+ * @param {string} html - The HTML content to parse
+ * @returns {string} The extracted target amount or empty string if not found
+ */
+function extractTargetAmountWithDOMParser(html) {
+	try {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(html, "text/html");
+
+		// Try to find elements with target-related classes
+		const selectors = [
+			".donationProgress--amount__target",
+			'[class*="donationProgress--amount__target"]',
+			'[class*="target"]',
+			'[class*="goal"]',
+			"[data-target]",
+			"[data-goal]",
+			"[data-target-amount]",
+		];
+
+		for (const selector of selectors) {
+			const elements = doc.querySelectorAll(selector);
+			for (const element of elements) {
+				const text = element.textContent || element.innerText || "";
+				// Try to extract amount from text
+				const amountMatch = text.match(/[\d,]+(?:\.\d+)?/);
+				if (amountMatch && isValidNumber(amountMatch[0])) {
+					logger.info(
+						"[SCRAPE]",
+						`Found target amount using DOMParser with selector "${selector}": ${amountMatch[0]}`,
+					);
+					return amountMatch[0];
+				}
+
+				// Try data attributes
+				const dataTarget =
+					element.getAttribute("data-target") ||
+					element.getAttribute("data-goal") ||
+					element.getAttribute("data-target-amount");
+				if (dataTarget && isValidNumber(dataTarget)) {
+					logger.info(
+						"[SCRAPE]",
+						`Found target amount using DOMParser data attribute: ${dataTarget}`,
+					);
+					return dataTarget;
+				}
+			}
+		}
+
+		// Try to find JSON data in script tags using DOMParser
+		const scriptTags = doc.querySelectorAll("script");
+		for (const script of scriptTags) {
+			const scriptContent = script.textContent || script.innerHTML || "";
+			for (let i = 0; i < TARGET_JSON_PATTERNS.length; i++) {
+				const pattern = TARGET_JSON_PATTERNS[i];
+				const match = scriptContent.match(pattern);
+				if (match) {
+					const captured = match[1];
+					if (isValidNumber(captured)) {
+						logger.info(
+							"[SCRAPE]",
+							`Found target amount in JSON using DOMParser: ${captured}`,
+						);
+						return captured;
+					}
+				}
+			}
+		}
+	} catch (error) {
+		logger.warn(
+			"[SCRAPE]",
+			"DOMParser extraction failed, falling back to regex:",
+			error,
+		);
+	}
+
+	return "";
+}
+
+/**
  * Extract target amount from HTML using multiple pattern strategies
+ * Tries DOMParser first, then falls back to regex patterns
  * @param {string} html - The HTML content to parse
  * @returns {string} The extracted target amount or empty string if not found
  */
 export function extractTargetAmount(html) {
-	let target = "";
+	// Try DOMParser first (more reliable for structured HTML)
+	let target = extractTargetAmountWithDOMParser(html);
+	if (target) {
+		return target;
+	}
+
+	logger.info(
+		"[SCRAPE]",
+		"DOMParser didn't find target amount, trying regex patterns...",
+	);
+	target = "";
 
 	// Look for the target amount in the HTML
 	for (let i = 0; i < TARGET_PATTERNS.length; i++) {

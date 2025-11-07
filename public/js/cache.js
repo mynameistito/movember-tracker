@@ -1,6 +1,7 @@
 // localStorage cache manager with TTL support
 // Consolidated cache: all data (including subdomain) stored in single key per member
 import { SUBDOMAIN_CACHE_TTL } from "./constants.js";
+import logger from "./logger.js";
 
 /**
  * Get cached donation data for a member (includes subdomain)
@@ -25,7 +26,7 @@ export function getCachedData(memberId) {
 
 		return data;
 	} catch (error) {
-		console.warn("[CACHE] Error reading cached data:", error);
+		logger.warn("[CACHE]", "Error reading cached data:", error);
 		return null;
 	}
 }
@@ -46,7 +47,7 @@ export function setCachedData(memberId, data, ttl) {
 		};
 		localStorage.setItem(cacheKey, JSON.stringify(cacheValue));
 	} catch (error) {
-		console.warn("[CACHE] Error setting cached data:", error);
+		logger.warn("[CACHE]", "Error setting cached data:", error);
 	}
 }
 
@@ -77,7 +78,7 @@ export function getCachedSubdomain(memberId) {
 		}
 		return null;
 	} catch (error) {
-		console.warn("[CACHE] Error reading cached subdomain:", error);
+		logger.warn("[CACHE]", "Error reading cached subdomain:", error);
 		return null;
 	}
 }
@@ -102,7 +103,7 @@ export function setCachedSubdomain(memberId, subdomain, ttl) {
 		// Save with the provided TTL
 		setCachedData(memberId, data, ttl);
 	} catch (error) {
-		console.warn("[CACHE] Error setting cached subdomain:", error);
+		logger.warn("[CACHE]", "Error setting cached subdomain:", error);
 	}
 }
 
@@ -123,6 +124,6 @@ export function clearSubdomainCache(memberId) {
 		const oldAmountKey = `movember:amount:${memberId}`;
 		localStorage.removeItem(oldAmountKey);
 	} catch (error) {
-		console.warn("[CACHE] Error clearing cached data:", error);
+		logger.warn("[CACHE]", "Error clearing cached data:", error);
 	}
 }

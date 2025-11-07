@@ -11,7 +11,7 @@
 		"check": "bunx @biomejs/biome check --write .",
 		"format": "bunx @biomejs/biome format --write .",
 		"tsc": "bunx tsc --noEmit",
-		"build:js": "esbuild public/js/movember-scraper.js --bundle --minify --sourcemap --outfile=public/js/bundle.js --format=esm --target=es2020",
+		"build:js": "esbuild src/client/movember-scraper.ts --bundle --minify --sourcemap --outfile=public/js/bundle.js --format=esm --target=es2020",
 		"build": "npm run build:js",
 		"test": "vitest",
 		"test:ui": "vitest --ui",

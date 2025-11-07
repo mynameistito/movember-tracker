@@ -14,7 +14,7 @@ export const ERROR_SEVERITY = {
 	MEDIUM: "medium",
 	HIGH: "high",
 	CRITICAL: "critical",
-};
+} as const;
 
 /**
  * Error categories
@@ -27,22 +27,42 @@ export const ERROR_CATEGORY = {
 	PARSING: "parsing",
 	VALIDATION: "validation",
 	UNKNOWN: "unknown",
-};
+} as const;
+
+export type ErrorSeverity = (typeof ERROR_SEVERITY)[keyof typeof ERROR_SEVERITY];
+export type ErrorCategory = (typeof ERROR_CATEGORY)[keyof typeof ERROR_CATEGORY];
+
+export interface ErrorContext {
+	category?: ErrorCategory;
+	severity?: ErrorSeverity;
+	memberId?: string;
+	subdomain?: string;
+	url?: string;
+	metadata?: Record<string, unknown>;
+}
+
+export interface ErrorInfo {
+	timestamp: string;
+	message: string;
+	stack?: string;
+	category: ErrorCategory;
+	severity: ErrorSeverity;
+	context: {
+		memberId?: string;
+		subdomain?: string;
+		url?: string;
+		[key: string]: unknown;
+	};
+}
 
 /**
  * Track an error with structured context
- * @param {Error|string} error - The error object or error message
- * @param {Object} context - Additional context about the error
- * @param {string} context.category - Error category (from ERROR_CATEGORY)
- * @param {string} context.severity - Error severity (from ERROR_SEVERITY)
- * @param {string} context.memberId - Member ID if applicable
- * @param {string} context.subdomain - Subdomain if applicable
- * @param {string} context.url - URL if applicable
- * @param {Object} context.metadata - Additional metadata
- * @returns {Object} The tracked error information
+ * @param error - The error object or error message
+ * @param context - Additional context about the error
+ * @returns The tracked error information
  */
-export function trackError(error, context = {}) {
-	const errorInfo = {
+export function trackError(error: Error | string, context: ErrorContext = {}): ErrorInfo {
+	const errorInfo: ErrorInfo = {
 		timestamp: new Date().toISOString(),
 		message: error instanceof Error ? error.message : String(error),
 		stack: error instanceof Error ? error.stack : undefined,
@@ -78,7 +98,7 @@ export function trackError(error, context = {}) {
 	try {
 		const storedErrors = JSON.parse(
 			localStorage.getItem("error_tracking_log") || "[]",
-		);
+		) as ErrorInfo[];
 		storedErrors.push(errorInfo);
 		// Keep only last 50 errors
 		if (storedErrors.length > 50) {
@@ -99,13 +119,10 @@ export function trackError(error, context = {}) {
 
 /**
  * Track a scraping error
- * @param {Error} error - The error object
- * @param {Object} context - Additional context
- * @param {string} context.memberId - Member ID
- * @param {string} context.subdomain - Subdomain
- * @param {string} context.url - URL
+ * @param error - The error object
+ * @param context - Additional context
  */
-export function trackScrapingError(error, context = {}) {
+export function trackScrapingError(error: Error, context: Omit<ErrorContext, "category" | "severity"> = {}): ErrorInfo {
 	return trackError(error, {
 		category: ERROR_CATEGORY.SCRAPING,
 		severity: ERROR_SEVERITY.HIGH,
@@ -115,11 +132,10 @@ export function trackScrapingError(error, context = {}) {
 
 /**
  * Track a subdomain detection error
- * @param {Error} error - The error object
- * @param {Object} context - Additional context
- * @param {string} context.memberId - Member ID
+ * @param error - The error object
+ * @param context - Additional context
  */
-export function trackSubdomainError(error, context = {}) {
+export function trackSubdomainError(error: Error, context: Omit<ErrorContext, "category" | "severity"> = {}): ErrorInfo {
 	return trackError(error, {
 		category: ERROR_CATEGORY.SUBDOMAIN,
 		severity: ERROR_SEVERITY.MEDIUM,
@@ -129,11 +145,10 @@ export function trackSubdomainError(error, context = {}) {
 
 /**
  * Track a network error
- * @param {Error} error - The error object
- * @param {Object} context - Additional context
- * @param {string} context.url - URL
+ * @param error - The error object
+ * @param context - Additional context
  */
-export function trackNetworkError(error, context = {}) {
+export function trackNetworkError(error: Error, context: Omit<ErrorContext, "category" | "severity"> = {}): ErrorInfo {
 	return trackError(error, {
 		category: ERROR_CATEGORY.NETWORK,
 		severity: ERROR_SEVERITY.HIGH,
@@ -143,12 +158,10 @@ export function trackNetworkError(error, context = {}) {
 
 /**
  * Track a parsing error
- * @param {Error} error - The error object
- * @param {Object} context - Additional context
- * @param {string} context.memberId - Member ID
- * @param {string} context.htmlLength - HTML length
+ * @param error - The error object
+ * @param context - Additional context
  */
-export function trackParsingError(error, context = {}) {
+export function trackParsingError(error: Error, context: Omit<ErrorContext, "category" | "severity"> = {}): ErrorInfo {
 	return trackError(error, {
 		category: ERROR_CATEGORY.PARSING,
 		severity: ERROR_SEVERITY.MEDIUM,
@@ -158,14 +171,14 @@ export function trackParsingError(error, context = {}) {
 
 /**
  * Get recent errors from localStorage
- * @param {number} limit - Maximum number of errors to return
- * @returns {Array} Array of recent errors
+ * @param limit - Maximum number of errors to return
+ * @returns Array of recent errors
  */
-export function getRecentErrors(limit = 10) {
+export function getRecentErrors(limit = 10): ErrorInfo[] {
 	try {
 		const storedErrors = JSON.parse(
 			localStorage.getItem("error_tracking_log") || "[]",
-		);
+		) as ErrorInfo[];
 		return storedErrors.slice(-limit);
 	} catch (e) {
 		logger.warn("[ERROR_TRACKING]", "Failed to get recent errors:", e);
@@ -176,7 +189,7 @@ export function getRecentErrors(limit = 10) {
 /**
  * Clear error tracking log
  */
-export function clearErrorLog() {
+export function clearErrorLog(): void {
 	try {
 		localStorage.removeItem("error_tracking_log");
 		logger.info("[ERROR_TRACKING]", "Error log cleared");
@@ -184,3 +197,4 @@ export function clearErrorLog() {
 		logger.warn("[ERROR_TRACKING]", "Failed to clear error log:", e);
 	}
 }
+

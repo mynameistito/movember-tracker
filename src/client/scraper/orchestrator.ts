@@ -10,6 +10,7 @@ import {
 	isCachedDataStale,
 	setCachedData,
 	setCachedSubdomain,
+	type CachedData,
 } from "../cache.js";
 import {
 	CACHE_TTL,
@@ -34,17 +35,31 @@ import {
 	getSubdomainForMember,
 } from "./subdomain.js";
 
+export interface ScrapedData extends CachedData {
+	amount: string;
+	currency: string;
+	subdomain: string;
+	timestamp: number;
+	target?: string;
+	percentage?: number;
+}
+
+export interface GetDataResult {
+	data: ScrapedData;
+	cacheStatus: "HIT" | "MISS" | "STALE" | "LIVE";
+}
+
 /**
  * Scrape the Movember page using Worker's CORS proxy and HTML parsing
- * @param {string} memberId - The member ID to scrape
- * @param {boolean} clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
- * @returns {Promise<{amount: string, currency: string, subdomain: string, timestamp: number, target?: string, percentage?: number}>} The scraped data
- * @throws {Error} If scraping fails
+ * @param memberId - The member ID to scrape
+ * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
+ * @returns The scraped data
+ * @throws If scraping fails
  */
 export async function scrapeMovemberPage(
-	memberId,
+	memberId: string,
 	clearSubdomainOn404 = false,
-) {
+): Promise<ScrapedData> {
 	let subdomain = await getSubdomainForMember(memberId);
 	const movemberUrl = buildMovemberUrl(memberId, subdomain);
 	const startTime = Date.now();
@@ -57,8 +72,8 @@ export async function scrapeMovemberPage(
 		// Fetch the HTML via Worker's CORS proxy
 		logger.info("[SCRAPE]", `Fetching HTML from ${movemberUrl} via proxy...`);
 		const fetchStart = Date.now();
-		let html;
-		let finalUrl;
+		let html: string;
+		let finalUrl: string;
 
 		try {
 			const result = await fetchViaProxy(movemberUrl);
@@ -66,7 +81,11 @@ export async function scrapeMovemberPage(
 			finalUrl = result.finalUrl;
 		} catch (error) {
 			// If we get an error, try clearing subdomain cache and re-detecting
-			if (clearSubdomainOn404 && error.message.includes("404")) {
+			if (
+				clearSubdomainOn404 &&
+				error instanceof Error &&
+				error.message.includes("404")
+			) {
 				logger.warn(
 					"[SCRAPE]",
 					`Got 404 for ${movemberUrl}, clearing cached subdomain and re-detecting...`,
@@ -177,10 +196,7 @@ export async function scrapeMovemberPage(
 		}
 
 		// Parse amount with subdomain to determine correct currency
-		const { value: raisedValue, currency } = parseAmount(
-			`$${raised}`,
-			subdomain,
-		);
+		const { value: raisedValue, currency } = parseAmount(`$${raised}`, subdomain);
 
 		// Validate the parsed value is not empty or zero (unless it's actually zero)
 		if (!raisedValue || raisedValue === "0" || raisedValue === "") {
@@ -194,7 +210,7 @@ export async function scrapeMovemberPage(
 		const currencySymbol = getCurrencySymbol(currency);
 		const raisedFormatted = `${currencySymbol}${raisedValue}`;
 
-		const result = {
+		const result: ScrapedData = {
 			amount: raisedFormatted,
 			currency,
 			subdomain, // Include subdomain in result for consolidated cache
@@ -233,7 +249,7 @@ export async function scrapeMovemberPage(
 		const errorMessage = error instanceof Error ? error.message : String(error);
 
 		// Track error with structured context
-		trackScrapingError(error, {
+		trackScrapingError(error instanceof Error ? error : new Error(errorMessage), {
 			memberId,
 			subdomain,
 			url: movemberUrl,
@@ -255,12 +271,12 @@ export async function scrapeMovemberPage(
 
 /**
  * Retry wrapper with exponential backoff
- * @param {string} memberId - The member ID to scrape
- * @returns {Promise<{amount: string, currency: string, subdomain: string, timestamp: number, target?: string, percentage?: number}>} The scraped data
- * @throws {Error} If all retries fail
+ * @param memberId - The member ID to scrape
+ * @returns The scraped data
+ * @throws If all retries fail
  */
-export async function scrapeWithRetry(memberId) {
-	let lastError = null;
+export async function scrapeWithRetry(memberId: string): Promise<ScrapedData> {
+	let lastError: Error | null = null;
 	const retryStartTime = Date.now();
 
 	logger.info(
@@ -320,13 +336,16 @@ export async function scrapeWithRetry(memberId) {
  * Main function to get data (with stale-while-revalidate caching)
  * Implements stale-while-revalidate pattern: returns stale data immediately if available,
  * then fetches fresh data in the background and updates cache
- * @param {string} memberId - The member ID to get data for
- * @param {boolean} grabLive - Whether to force a fresh scrape (bypass cache)
- * @returns {Promise<{data: {amount: string, currency: string, subdomain: string, timestamp: number, target?: string, percentage?: number}, cacheStatus: string}>} The data and cache status
+ * @param memberId - The member ID to get data for
+ * @param grabLive - Whether to force a fresh scrape (bypass cache)
+ * @returns The data and cache status
  */
-export async function getData(memberId, grabLive = false) {
-	let data = null;
-	let cacheStatus = "HIT";
+export async function getData(
+	memberId: string,
+	grabLive = false,
+): Promise<GetDataResult> {
+	let data: ScrapedData | null = null;
+	let cacheStatus: GetDataResult["cacheStatus"] = "HIT";
 
 	if (grabLive) {
 		// Force fresh scrape, bypass cache
@@ -411,5 +430,6 @@ export async function getData(memberId, grabLive = false) {
 		}
 	}
 
-	return { data, cacheStatus };
+	return { data: data!, cacheStatus };
 }
+

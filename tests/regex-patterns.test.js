@@ -10,7 +10,7 @@ import {
 	TARGET_JSON_PATTERNS,
 	TARGET_PATTERNS,
 	URL_PATTERNS,
-} from "../public/js/regex-patterns.js";
+} from "../public/js/bundle.js";
 
 describe("regex-patterns.js", () => {
 	describe("URL_PATTERNS", () => {

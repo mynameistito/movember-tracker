@@ -11,17 +11,19 @@ const LOG_LEVELS = {
 	WARN: 2,
 	ERROR: 3,
 	NONE: 4,
-};
+} as const;
+
+type LogLevel = keyof typeof LOG_LEVELS;
 
 // Default log level (can be overridden via localStorage or environment)
-let currentLogLevel = LOG_LEVELS.INFO;
+let currentLogLevel: number = LOG_LEVELS.INFO;
 
 // Initialize log level from localStorage or default
-function initializeLogLevel() {
+function initializeLogLevel(): void {
 	try {
 		const stored = localStorage.getItem("LOG_LEVEL");
 		if (stored) {
-			const level = stored.toUpperCase();
+			const level = stored.toUpperCase() as LogLevel;
 			if (level in LOG_LEVELS) {
 				currentLogLevel = LOG_LEVELS[level];
 				return;
@@ -54,7 +56,7 @@ initializeLogLevel();
 /**
  * Format log message with prefix
  */
-function formatMessage(level, prefix, ...args) {
+function formatMessage(level: string, prefix: string, ...args: unknown[]): unknown[] {
 	const timestamp = new Date().toISOString();
 	return [`[${timestamp}] [${level}] ${prefix}`, ...args];
 }
@@ -62,7 +64,7 @@ function formatMessage(level, prefix, ...args) {
 /**
  * Check if log level should be output
  */
-function shouldLog(level) {
+function shouldLog(level: LogLevel): boolean {
 	return LOG_LEVELS[level] >= currentLogLevel;
 }
 
@@ -72,10 +74,10 @@ function shouldLog(level) {
 export const logger = {
 	/**
 	 * Set the log level
-	 * @param {string} level - One of: 'DEBUG', 'INFO', 'WARN', 'ERROR', 'NONE'
+	 * @param level - One of: 'DEBUG', 'INFO', 'WARN', 'ERROR', 'NONE'
 	 */
-	setLevel(level) {
-		const upperLevel = level.toUpperCase();
+	setLevel(level: string): void {
+		const upperLevel = level.toUpperCase() as LogLevel;
 		if (upperLevel in LOG_LEVELS) {
 			currentLogLevel = LOG_LEVELS[upperLevel];
 			try {
@@ -104,9 +106,9 @@ export const logger = {
 
 	/**
 	 * Get the current log level
-	 * @returns {string} Current log level name
+	 * @returns Current log level name
 	 */
-	getLevel() {
+	getLevel(): string {
 		for (const [name, value] of Object.entries(LOG_LEVELS)) {
 			if (value === currentLogLevel) {
 				return name;
@@ -118,7 +120,7 @@ export const logger = {
 	/**
 	 * Debug level logging (most verbose)
 	 */
-	debug(prefix, ...args) {
+	debug(prefix: string, ...args: unknown[]): void {
 		if (shouldLog("DEBUG")) {
 			console.debug(...formatMessage("DEBUG", prefix, ...args));
 		}
@@ -127,7 +129,7 @@ export const logger = {
 	/**
 	 * Info level logging (default)
 	 */
-	info(prefix, ...args) {
+	info(prefix: string, ...args: unknown[]): void {
 		if (shouldLog("INFO")) {
 			console.log(...formatMessage("INFO", prefix, ...args));
 		}
@@ -136,7 +138,7 @@ export const logger = {
 	/**
 	 * Warning level logging
 	 */
-	warn(prefix, ...args) {
+	warn(prefix: string, ...args: unknown[]): void {
 		if (shouldLog("WARN")) {
 			console.warn(...formatMessage("WARN", prefix, ...args));
 		}
@@ -145,7 +147,7 @@ export const logger = {
 	/**
 	 * Error level logging
 	 */
-	error(prefix, ...args) {
+	error(prefix: string, ...args: unknown[]): void {
 		if (shouldLog("ERROR")) {
 			console.error(...formatMessage("ERROR", prefix, ...args));
 		}
@@ -154,3 +156,4 @@ export const logger = {
 
 // Export default logger
 export default logger;
+

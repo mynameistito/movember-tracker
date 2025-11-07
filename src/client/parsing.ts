@@ -1,16 +1,21 @@
 import { getCurrencyFromSubdomain } from "./constants.js";
 
+export interface ParsedAmount {
+	value: string;
+	currency: string;
+}
+
 /**
  * Extract amount from text and determine currency from subdomain
  * Currency is ALWAYS determined from subdomain, never from HTML/text parsing
- * @param {string} text - The text containing the amount (may include currency symbols)
- * @param {string} subdomain - Required subdomain (e.g., "uk", "au", "us") to determine currency
- * @returns {{value: string, currency: string}} Object containing the extracted amount value and currency code
+ * @param text - The text containing the amount (may include currency symbols)
+ * @param subdomain - Required subdomain (e.g., "uk", "au", "us") to determine currency
+ * @returns Object containing the extracted amount value and currency code
  * @example
  * parseAmount("$1,234.56", "us") // { value: "1,234.56", currency: "USD" }
  * parseAmount("£500", "uk") // { value: "500", currency: "GBP" }
  */
-export const parseAmount = (text, subdomain) => {
+export const parseAmount = (text: string, subdomain: string | null | undefined): ParsedAmount => {
 	// Remove whitespace and extract amount
 	const cleaned = text.trim();
 
@@ -32,15 +37,15 @@ export const parseAmount = (text, subdomain) => {
 /**
  * Validate that a captured value is a valid number
  * Checks for digits, removes currency symbols, and ensures the value is not just symbols
- * @param {string} value - The value to validate
- * @returns {boolean} True if the value is a valid number, false otherwise
+ * @param value - The value to validate
+ * @returns True if the value is a valid number, false otherwise
  * @example
  * isValidNumber("1,234.56") // true
  * isValidNumber("$500") // true
  * isValidNumber("abc") // false
  * isValidNumber("$") // false
  */
-export const isValidNumber = (value) => {
+export const isValidNumber = (value: string | null | undefined): boolean => {
 	if (!value || typeof value !== "string") {
 		return false;
 	}
@@ -63,16 +68,17 @@ export const isValidNumber = (value) => {
 
 /**
  * Calculate percentage of raised amount relative to target
- * @param {string} raised - The raised amount (may include commas)
- * @param {string} target - The target amount (may include commas)
- * @returns {number} The percentage (0-100), or 0 if target is 0
+ * @param raised - The raised amount (may include commas)
+ * @param target - The target amount (may include commas)
+ * @returns The percentage (0-100), or 0 if target is 0
  * @example
  * calculatePercentage("2,500", "10,000") // 25
  * calculatePercentage("500", "1,000") // 50
  */
-export const calculatePercentage = (raised, target) => {
+export const calculatePercentage = (raised: string, target: string): number => {
 	const raisedNum = parseFloat(raised.replace(/,/g, ""));
 	const targetNum = parseFloat(target.replace(/,/g, ""));
 	if (targetNum === 0) return 0;
 	return Math.round((raisedNum / targetNum) * 100);
 };
+

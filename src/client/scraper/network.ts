@@ -8,12 +8,17 @@ import { trackNetworkError } from "../error-tracking.js";
 import logger from "../logger.js";
 import { URL_PATTERNS } from "../regex-patterns.js";
 
+export interface FetchResult {
+	html: string;
+	finalUrl: string;
+}
+
 /**
  * Extract subdomain from a Movember URL
- * @param {string} url - The Movember URL
- * @returns {string|null} The subdomain (e.g., "uk", "au", "us") or null if not found
+ * @param url - The Movember URL
+ * @returns The subdomain (e.g., "uk", "au", "us") or null if not found
  */
-export function extractSubdomainFromUrl(url) {
+export function extractSubdomainFromUrl(url: string): string | null {
 	const match = url.match(URL_PATTERNS.SUBDOMAIN);
 	return match ? match[1] : null;
 }
@@ -21,11 +26,11 @@ export function extractSubdomainFromUrl(url) {
 /**
  * Fetch HTML using Worker's CORS proxy
  * Returns both HTML and the final URL after redirects
- * @param {string} url - The URL to fetch
- * @returns {Promise<{html: string, finalUrl: string}>} The HTML content and final URL
- * @throws {Error} If the proxy request fails
+ * @param url - The URL to fetch
+ * @returns The HTML content and final URL
+ * @throws If the proxy request fails
  */
-export async function fetchViaProxy(url) {
+export async function fetchViaProxy(url: string): Promise<FetchResult> {
 	const proxyUrl = `${getProxyUrl()}?url=${encodeURIComponent(url)}`;
 	const response = await fetch(proxyUrl);
 
@@ -35,7 +40,7 @@ export async function fetchViaProxy(url) {
 		try {
 			const contentType = response.headers.get("content-type");
 			if (contentType?.includes("application/json")) {
-				const errorData = await response.json();
+				const errorData = (await response.json()) as { message?: string };
 				if (errorData.message) {
 					errorMessage = errorData.message;
 				}
@@ -73,11 +78,12 @@ export async function fetchViaProxy(url) {
 
 /**
  * Build Movember URL with correct subdomain for a member
- * @param {string} memberId - The member ID
- * @param {string} subdomain - The subdomain to use
- * @returns {string} The complete Movember URL
+ * @param memberId - The member ID
+ * @param subdomain - The subdomain to use
+ * @returns The complete Movember URL
  */
-export function buildMovemberUrl(memberId, subdomain) {
+export function buildMovemberUrl(memberId: string, subdomain: string): string {
 	const baseUrl = MOVEMBER_BASE_URL_TEMPLATE.replace("{subdomain}", subdomain);
 	return `${baseUrl}?memberId=${memberId}`;
 }
+

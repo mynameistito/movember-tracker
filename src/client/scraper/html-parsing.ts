@@ -15,13 +15,18 @@ import {
 	TARGET_PATTERNS,
 } from "../regex-patterns.js";
 
+export interface ExtractedAmounts {
+	raised: string;
+	target: string;
+}
+
 /**
  * Extract raised amount from HTML using DOMParser (primary method)
  * Falls back to regex if DOMParser fails or doesn't find results
- * @param {string} html - The HTML content to parse
- * @returns {string} The extracted raised amount or empty string if not found
+ * @param html - The HTML content to parse
+ * @returns The extracted raised amount or empty string if not found
  */
-function extractRaisedAmountWithDOMParser(html) {
+function extractRaisedAmountWithDOMParser(html: string): string {
 	try {
 		const parser = new DOMParser();
 		const doc = parser.parseFromString(html, "text/html");
@@ -38,8 +43,8 @@ function extractRaisedAmountWithDOMParser(html) {
 
 		for (const selector of selectors) {
 			const elements = doc.querySelectorAll(selector);
-			for (const element of elements) {
-				const text = element.textContent || element.innerText || "";
+			for (const element of Array.from(elements)) {
+				const text = element.textContent || (element as HTMLElement).innerText || "";
 				// Try to extract amount from text
 				const amountMatch = text.match(/[\d,]+(?:\.\d+)?/);
 				if (amountMatch && isValidNumber(amountMatch[0])) {
@@ -67,7 +72,7 @@ function extractRaisedAmountWithDOMParser(html) {
 
 		// Try to find JSON data in script tags using DOMParser
 		const scriptTags = doc.querySelectorAll("script");
-		for (const script of scriptTags) {
+		for (const script of Array.from(scriptTags)) {
 			const scriptContent = script.textContent || script.innerHTML || "";
 			for (let i = 0; i < RAISED_JSON_PATTERNS.length; i++) {
 				const pattern = RAISED_JSON_PATTERNS[i];
@@ -98,10 +103,10 @@ function extractRaisedAmountWithDOMParser(html) {
 /**
  * Extract raised amount from HTML using multiple pattern strategies
  * Tries DOMParser first, then falls back to regex patterns
- * @param {string} html - The HTML content to parse
- * @returns {string} The extracted raised amount or empty string if not found
+ * @param html - The HTML content to parse
+ * @returns The extracted raised amount or empty string if not found
  */
-export function extractRaisedAmount(html) {
+export function extractRaisedAmount(html: string): string {
 	// Try DOMParser first (more reliable for structured HTML)
 	let raised = extractRaisedAmountWithDOMParser(html);
 	if (raised) {
@@ -226,13 +231,18 @@ export function extractRaisedAmount(html) {
 
 		if (allDollarMatches.length > 0) {
 			// Score each dollar amount based on context
-			const scoredAmounts = [];
+			const scoredAmounts: Array<{
+				amount: string;
+				score: number;
+				raisedScore: number;
+				context: string;
+			}> = [];
 
 			for (const match of allDollarMatches) {
 				const amount = match[1];
 				if (!isValidNumber(amount)) continue;
 
-				const matchIndex = match.index;
+				const matchIndex = match.index ?? 0;
 				const contextStart = Math.max(0, matchIndex - 300);
 				const contextEnd = Math.min(
 					html.length,
@@ -300,10 +310,10 @@ export function extractRaisedAmount(html) {
 /**
  * Extract target amount from HTML using DOMParser (primary method)
  * Falls back to regex if DOMParser fails or doesn't find results
- * @param {string} html - The HTML content to parse
- * @returns {string} The extracted target amount or empty string if not found
+ * @param html - The HTML content to parse
+ * @returns The extracted target amount or empty string if not found
  */
-function extractTargetAmountWithDOMParser(html) {
+function extractTargetAmountWithDOMParser(html: string): string {
 	try {
 		const parser = new DOMParser();
 		const doc = parser.parseFromString(html, "text/html");
@@ -321,8 +331,8 @@ function extractTargetAmountWithDOMParser(html) {
 
 		for (const selector of selectors) {
 			const elements = doc.querySelectorAll(selector);
-			for (const element of elements) {
-				const text = element.textContent || element.innerText || "";
+			for (const element of Array.from(elements)) {
+				const text = element.textContent || (element as HTMLElement).innerText || "";
 				// Try to extract amount from text
 				const amountMatch = text.match(/[\d,]+(?:\.\d+)?/);
 				if (amountMatch && isValidNumber(amountMatch[0])) {
@@ -350,7 +360,7 @@ function extractTargetAmountWithDOMParser(html) {
 
 		// Try to find JSON data in script tags using DOMParser
 		const scriptTags = doc.querySelectorAll("script");
-		for (const script of scriptTags) {
+		for (const script of Array.from(scriptTags)) {
 			const scriptContent = script.textContent || script.innerHTML || "";
 			for (let i = 0; i < TARGET_JSON_PATTERNS.length; i++) {
 				const pattern = TARGET_JSON_PATTERNS[i];
@@ -381,10 +391,10 @@ function extractTargetAmountWithDOMParser(html) {
 /**
  * Extract target amount from HTML using multiple pattern strategies
  * Tries DOMParser first, then falls back to regex patterns
- * @param {string} html - The HTML content to parse
- * @returns {string} The extracted target amount or empty string if not found
+ * @param html - The HTML content to parse
+ * @returns The extracted target amount or empty string if not found
  */
-export function extractTargetAmount(html) {
+export function extractTargetAmount(html: string): string {
 	// Try DOMParser first (more reliable for structured HTML)
 	let target = extractTargetAmountWithDOMParser(html);
 	if (target) {
@@ -479,7 +489,7 @@ export function extractTargetAmount(html) {
 			if (match) {
 				// Iterate backward from the last capture group to index 1
 				// Pick the first non-empty capture that passes isValidNumber
-				let captured = null;
+				let captured: string | null = null;
 				for (let j = match.length - 1; j >= 1; j--) {
 					if (match[j] && isValidNumber(match[j])) {
 						captured = match[j];
@@ -510,13 +520,18 @@ export function extractTargetAmount(html) {
 
 		if (allDollarMatches.length > 0) {
 			// Score each dollar amount based on context
-			const scoredAmounts = [];
+			const scoredAmounts: Array<{
+				amount: string;
+				score: number;
+				targetScore: number;
+				context: string;
+			}> = [];
 
 			for (const match of allDollarMatches) {
 				const amount = match[1];
 				if (!isValidNumber(amount)) continue;
 
-				const matchIndex = match.index;
+				const matchIndex = match.index ?? 0;
 				const contextStart = Math.max(0, matchIndex - 300);
 				const contextEnd = Math.min(
 					html.length,
@@ -577,12 +592,16 @@ export function extractTargetAmount(html) {
 
 /**
  * Extract both raised and target amounts from HTML
- * @param {string} html - The HTML content to parse
- * @param {string} memberId - The member ID (for logging)
- * @param {string} subdomain - The subdomain (for logging)
- * @returns {{raised: string, target: string}} Object containing extracted amounts
+ * @param html - The HTML content to parse
+ * @param memberId - The member ID (for logging)
+ * @param subdomain - The subdomain (for logging)
+ * @returns Object containing extracted amounts
  */
-export function extractAmounts(html, memberId, subdomain) {
+export function extractAmounts(
+	html: string,
+	memberId: string,
+	subdomain: string,
+): ExtractedAmounts {
 	const extractStart = Date.now();
 	logger.info("[SCRAPE]", "Extracting data from HTML...");
 
@@ -605,3 +624,4 @@ export function extractAmounts(html, memberId, subdomain) {
 
 	return { raised, target };
 }
+

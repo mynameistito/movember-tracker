@@ -3,7 +3,7 @@ import {
 	calculatePercentage,
 	isValidNumber,
 	parseAmount,
-} from "../public/js/parsing.js";
+} from "../public/js/bundle.js";
 
 describe("parsing.js", () => {
 	describe("parseAmount", () => {

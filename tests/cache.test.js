@@ -5,7 +5,7 @@ import {
 	getCachedSubdomain,
 	setCachedData,
 	setCachedSubdomain,
-} from "../public/js/cache.js";
+} from "../public/js/bundle.js";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -26,7 +26,7 @@ const localStorageMock = (() => {
 })();
 
 // Mock logger to avoid console output during tests
-vi.mock("../public/js/logger.js", () => ({
+vi.mock("../src/client/logger.js", () => ({
 	default: {
 		debug: vi.fn(),
 		info: vi.fn(),

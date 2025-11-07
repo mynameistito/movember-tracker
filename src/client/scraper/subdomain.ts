@@ -26,10 +26,10 @@ import {
  * Detect subdomain from HTML content by checking currency symbols
  * This is used for verification - if currency doesn't match URL subdomain, we skip it
  * Made more aggressive: checks for currency symbols anywhere, not just near amounts
- * @param {string} html - The HTML content to analyze
- * @returns {string|null} The detected subdomain or null if not found
+ * @param html - The HTML content to analyze
+ * @returns The detected subdomain or null if not found
  */
-export function detectSubdomainFromHtml(html) {
+export function detectSubdomainFromHtml(html: string | null | undefined): string | null {
 	if (!html) return null;
 
 	// First, check for unambiguous currency symbols anywhere in HTML (most reliable)
@@ -137,11 +137,14 @@ export function detectSubdomainFromHtml(html) {
 
 /**
  * Detect subdomain by following redirects and checking HTML content
- * @param {string} memberId - The member ID
- * @param {boolean} forceRefresh - Whether to force refresh (skip cache)
- * @returns {Promise<string>} The detected subdomain
+ * @param memberId - The member ID
+ * @param forceRefresh - Whether to force refresh (skip cache)
+ * @returns The detected subdomain
  */
-export async function detectSubdomainForMember(memberId, forceRefresh = false) {
+export async function detectSubdomainForMember(
+	memberId: string,
+	forceRefresh = false,
+): Promise<string> {
 	// Check cache first (unless forcing refresh)
 	if (!forceRefresh) {
 		const cached = getCachedSubdomain(memberId);
@@ -198,7 +201,7 @@ export async function detectSubdomainForMember(memberId, forceRefresh = false) {
 		// Try common subdomains and check for currency indicators
 		// Primary method: Verify with HTML currency check (most reliable)
 		// Secondary method: Use URL subdomain as fallback if currency check is inconclusive
-		let fallbackSubdomain = null;
+		let fallbackSubdomain: string | null = null;
 
 		// Optimized: Test subdomains with early exit when match is found
 		// This reduces average detection time significantly
@@ -274,7 +277,8 @@ export async function detectSubdomainForMember(memberId, forceRefresh = false) {
 				}
 			} catch (e) {
 				// Continue to next subdomain (optimized: don't log every error to reduce noise)
-				if (e.message && !e.message.includes("404")) {
+				const error = e instanceof Error ? e : new Error(String(e));
+				if (error.message && !error.message.includes("404")) {
 					logger.warn("[SUBDOMAIN]", `Error trying subdomain ${subdomain}:`, e);
 				}
 			}
@@ -319,12 +323,15 @@ export async function detectSubdomainForMember(memberId, forceRefresh = false) {
 		return DEFAULT_SUBDOMAIN;
 	} catch (error) {
 		// Track error with structured context
-		trackSubdomainError(error, {
-			memberId,
-			metadata: {
-				timestamp: Date.now(),
+		trackSubdomainError(
+			error instanceof Error ? error : new Error(String(error)),
+			{
+				memberId,
+				metadata: {
+					timestamp: Date.now(),
+				},
 			},
-		});
+		);
 
 		logger.warn(
 			"[SUBDOMAIN]",
@@ -338,10 +345,10 @@ export async function detectSubdomainForMember(memberId, forceRefresh = false) {
 
 /**
  * Get subdomain for a member ID (with auto-detection)
- * @param {string} memberId - The member ID
- * @returns {Promise<string>} The subdomain for the member
+ * @param memberId - The member ID
+ * @returns The subdomain for the member
  */
-export async function getSubdomainForMember(memberId) {
+export async function getSubdomainForMember(memberId: string): Promise<string> {
 	// Check manual override first
 	if (MEMBER_SUBDOMAIN_MAP[memberId]) {
 		return MEMBER_SUBDOMAIN_MAP[memberId];
@@ -350,3 +357,4 @@ export async function getSubdomainForMember(memberId) {
 	// Auto-detect (will check cache internally)
 	return await detectSubdomainForMember(memberId);
 }
+

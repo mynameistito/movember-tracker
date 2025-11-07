@@ -13,7 +13,7 @@ export const URL_PATTERNS = {
 };
 
 // Currency code patterns for subdomain detection
-export const CURRENCY_CODE_PATTERNS = [
+export const CURRENCY_CODE_PATTERNS: RegExp[] = [
 	/\bGBP\b[\s:]*[\d,]+|[\d,]+[\s:]*\bGBP\b|British\s+Pound/i,
 	/\bEUR\b[\s:]*[\d,]+|[\d,]+[\s:]*\bEUR\b|Euro[\s:]*[\d,]+/i,
 	/\bUSD\b[\s:]*[\d,]+|[\d,]+[\s:]*\bUSD\b|US\s+Dollar/i,
@@ -27,7 +27,7 @@ export const CURRENCY_CODE_PATTERNS = [
 ];
 
 // Country detection patterns
-export const COUNTRY_DETECTION_PATTERNS = {
+export const COUNTRY_DETECTION_PATTERNS: Record<string, RegExp> = {
 	IRELAND: /Ireland|Irish/i,
 	NETHERLANDS: /Netherlands|Dutch/i,
 	GERMANY: /Germany|German/i,
@@ -45,7 +45,7 @@ export const DOLLAR_AMOUNT_PATTERN = /\$[\d,]+/;
 
 // Raised amount extraction patterns (optimized with combined patterns)
 // Patterns are grouped by similarity and combined using alternation for better performance
-export const RAISED_PATTERNS = [
+export const RAISED_PATTERNS: RegExp[] = [
 	// Group 1: AmountRaised object patterns (most reliable) - combined
 	/"AmountRaised"[^}]*"(?:convertedAmount|originalAmount)"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
 	// Group 2: CSS class patterns with dollar sign - combined
@@ -64,7 +64,7 @@ export const RAISED_PATTERNS = [
 
 // Target amount extraction patterns (optimized with combined patterns)
 // Patterns are grouped by similarity and combined using alternation for better performance
-export const TARGET_PATTERNS = [
+export const TARGET_PATTERNS: RegExp[] = [
 	// Group 1: target.fundraising.value (most reliable) - separate (most specific)
 	/"target"[^}]*"fundraising"[^}]*"value"["\s:]*["']([\d,]+(?:\.\d+)?)/i,
 	// Group 2: CSS class patterns with dollar sign - combined
@@ -82,7 +82,7 @@ export const TARGET_PATTERNS = [
 ];
 
 // JSON script tag patterns for raised amounts (optimized with combined patterns)
-export const RAISED_JSON_PATTERNS = [
+export const RAISED_JSON_PATTERNS: RegExp[] = [
 	// Combined JSON property patterns
 	/"(?:raised|raisedAmount|currentAmount|donationAmount|amount)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
 	// Unquoted property pattern (separate due to different structure)
@@ -90,7 +90,7 @@ export const RAISED_JSON_PATTERNS = [
 ];
 
 // JSON script tag patterns for target amounts (optimized with combined patterns)
-export const TARGET_JSON_PATTERNS = [
+export const TARGET_JSON_PATTERNS: RegExp[] = [
 	// Combined JSON property patterns
 	/"(?:target|targetAmount|goal)"[:\s]*["']?\$?([\d,]+(?:\.\d+)?)/i,
 	// Unquoted property patterns - combined
@@ -98,7 +98,7 @@ export const TARGET_JSON_PATTERNS = [
 ];
 
 // Generic fallback patterns for raised amounts
-export const GENERIC_RAISED_PATTERNS = [
+export const GENERIC_RAISED_PATTERNS: RegExp[] = [
 	// Look for $X,XXX pattern in common HTML structures
 	/\$([\d,]+(?:\.\d+)?)\s*(?:raised|donated|collected)/i,
 	/(?:raised|donated|collected)[:\s]*\$([\d,]+(?:\.\d+)?)/i,
@@ -114,7 +114,7 @@ export const GENERIC_RAISED_PATTERNS = [
 ];
 
 // Generic fallback patterns for target amounts
-export const GENERIC_TARGET_PATTERNS = [
+export const GENERIC_TARGET_PATTERNS: RegExp[] = [
 	// Look for $X,XXX pattern with target/goal keywords
 	/\$([\d,]+(?:\.\d+)?)\s*(?:target|goal)/i,
 	/(?:target|goal)[:\s]*\$([\d,]+(?:\.\d+)?)/i,
@@ -128,3 +128,4 @@ export const GENERIC_TARGET_PATTERNS = [
 	/target[:\s=]+[$]?([\d,]+(?:\.\d+)?)/i,
 	/goal[:\s=]+[$]?([\d,]+(?:\.\d+)?)/i,
 ];
+

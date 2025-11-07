@@ -25,6 +25,64 @@ export default {
           );
         }
 
+        // Origin validation: Only allow requests from the same Worker domain
+        const workerOrigin = url.origin;
+        const requestOrigin = request.headers.get("Origin");
+        const referer = request.headers.get("Referer");
+        
+        let requestOriginToCheck = requestOrigin;
+        if (!requestOriginToCheck && referer) {
+          try {
+            requestOriginToCheck = new URL(referer).origin;
+          } catch {
+            // Invalid Referer URL, will fail origin check
+          }
+        }
+        
+        if (!requestOriginToCheck || requestOriginToCheck.toLowerCase() !== workerOrigin.toLowerCase()) {
+          return new Response(
+            JSON.stringify({ error: "Origin not allowed" }),
+            {
+              status: 403,
+              headers: {
+                "content-type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          );
+        }
+
+        // Domain validation: Only allow *.movember.com domains
+        let targetUrlObj: URL;
+        try {
+          targetUrlObj = new URL(targetUrl);
+        } catch {
+          return new Response(
+            JSON.stringify({ error: "Invalid URL format" }),
+            {
+              status: 400,
+              headers: {
+                "content-type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          );
+        }
+        
+        const targetHostname = targetUrlObj.hostname.toLowerCase();
+        if (!targetHostname.endsWith(".movember.com")) {
+          return new Response(
+            JSON.stringify({ error: "Only *.movember.com domains are allowed" }),
+            {
+              status: 403,
+              headers: {
+                "content-type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          );
+        }
+
         try {
           console.log(`[PROXY] Fetching: ${targetUrl}`);
           const response = await fetch(targetUrl, {

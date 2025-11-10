@@ -41,3 +41,4 @@ wrangler.toml.local
 # Cursor
 ./cursor/plans/
 /.cursor/plans
+/dave-scraper/

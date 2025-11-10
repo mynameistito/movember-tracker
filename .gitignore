@@ -38,3 +38,6 @@ lerna-debug.log*
 .wrangler/
 wrangler.toml.local
 
+# Cursor
+./cursor/plans/
+/.cursor/plans

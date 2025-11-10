@@ -1,32 +1,147 @@
 // Simple static file server for client-side application
+
+// Rate limiting: Simple in-memory store (resets on worker restart)
+// In production, consider using Cloudflare KV or Durable Objects for persistence
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+// Rate limit configuration
+const RATE_LIMIT = {
+	maxRequests: 100, // Max requests per window
+	windowMs: 60 * 1000, // 1 minute window
+};
+
+/**
+ * Check if request exceeds rate limit
+ * @param request - The incoming request
+ * @returns true if rate limit exceeded, false otherwise
+ */
+function checkRateLimit(request: Request): boolean {
+	// Get client identifier (IP address)
+	const clientId =
+		request.headers.get("CF-Connecting-IP") ||
+		request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
+		"unknown";
+
+	const now = Date.now();
+	const record = rateLimitStore.get(clientId);
+
+	// Clean up expired entries periodically (every 100 requests)
+	if (rateLimitStore.size > 1000) {
+		for (const [key, value] of rateLimitStore.entries()) {
+			if (value.resetAt < now) {
+				rateLimitStore.delete(key);
+			}
+		}
+	}
+
+	if (!record || record.resetAt < now) {
+		// New window or expired window
+		rateLimitStore.set(clientId, {
+			count: 1,
+			resetAt: now + RATE_LIMIT.windowMs,
+		});
+		return false;
+	}
+
+	// Increment count
+	record.count++;
+
+	if (record.count > RATE_LIMIT.maxRequests) {
+		return true; // Rate limit exceeded
+	}
+
+	return false;
+}
+
+/**
+ * Get CORS headers with validated origin
+ * @param request - The incoming request
+ * @param workerOrigin - The worker's origin
+ * @returns CORS headers object
+ */
+function getCorsHeaders(
+	request: Request,
+	workerOrigin: string,
+): Record<string, string> {
+	const requestOrigin = request.headers.get("Origin");
+	const referer = request.headers.get("Referer");
+
+	let originToUse: string | null = requestOrigin;
+	if (!originToUse && referer) {
+		try {
+			originToUse = new URL(referer).origin;
+		} catch {
+			// Invalid Referer URL
+		}
+	}
+
+	// Validate origin matches worker origin
+	if (originToUse && originToUse.toLowerCase() === workerOrigin.toLowerCase()) {
+		return {
+			"Access-Control-Allow-Origin": originToUse,
+			"Access-Control-Allow-Methods": "GET, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type",
+			"Access-Control-Max-Age": "86400",
+		};
+	}
+
+	// Fallback: return worker origin (safer than "*")
+	return {
+		"Access-Control-Allow-Origin": workerOrigin,
+		"Access-Control-Allow-Methods": "GET, OPTIONS",
+		"Access-Control-Allow-Headers": "Content-Type",
+		"Access-Control-Max-Age": "86400",
+	};
+}
+
 export default {
 	async fetch(request: Request, env: { ASSETS?: Fetcher }): Promise<Response> {
 		const url = new URL(request.url);
 		const pathname = url.pathname;
 		const method = request.method;
+		const workerOrigin = url.origin;
 
 		console.log(`[REQUEST] ${method} ${pathname} from ${url.origin}`);
 
 		try {
 			// CORS proxy endpoint for fetching Movember pages
 			if (pathname === "/proxy") {
+				// Check rate limit
+				if (checkRateLimit(request)) {
+					const corsHeaders = getCorsHeaders(request, workerOrigin);
+					return new Response(
+						JSON.stringify({
+							error: "Rate limit exceeded",
+							message: `Maximum ${RATE_LIMIT.maxRequests} requests per ${RATE_LIMIT.windowMs / 1000} seconds`,
+						}),
+						{
+							status: 429,
+							headers: {
+								"content-type": "application/json",
+								...corsHeaders,
+								"Retry-After": String(Math.ceil(RATE_LIMIT.windowMs / 1000)),
+							},
+						},
+					);
+				}
+
 				const targetUrl = url.searchParams.get("url");
 
 				if (!targetUrl) {
+					const corsHeaders = getCorsHeaders(request, workerOrigin);
 					return new Response(
 						JSON.stringify({ error: "Missing 'url' query parameter" }),
 						{
 							status: 400,
 							headers: {
 								"content-type": "application/json",
-								"Access-Control-Allow-Origin": "*",
+								...corsHeaders,
 							},
 						},
 					);
 				}
 
 				// Origin validation: Only allow requests from the same Worker domain
-				const workerOrigin = url.origin;
 				const requestOrigin = request.headers.get("Origin");
 				const referer = request.headers.get("Referer");
 
@@ -43,17 +158,19 @@ export default {
 					!requestOriginToCheck ||
 					requestOriginToCheck.toLowerCase() !== workerOrigin.toLowerCase()
 				) {
+					const corsHeaders = getCorsHeaders(request, workerOrigin);
 					return new Response(JSON.stringify({ error: "Origin not allowed" }), {
 						status: 403,
 						headers: {
 							"content-type": "application/json",
-							"Access-Control-Allow-Origin": "*",
+							...corsHeaders,
 						},
 					});
 				}
 
 				// Domain validation: Only allow *.movember.com domains
 				let targetUrlObj: URL;
+				const corsHeaders = getCorsHeaders(request, workerOrigin);
 				try {
 					targetUrlObj = new URL(targetUrl);
 				} catch {
@@ -61,7 +178,7 @@ export default {
 						status: 400,
 						headers: {
 							"content-type": "application/json",
-							"Access-Control-Allow-Origin": "*",
+							...corsHeaders,
 						},
 					});
 				}
@@ -76,7 +193,7 @@ export default {
 							status: 403,
 							headers: {
 								"content-type": "application/json",
-								"Access-Control-Allow-Origin": "*",
+								...corsHeaders,
 							},
 						},
 					);
@@ -107,9 +224,7 @@ export default {
 						status: 200,
 						headers: {
 							"content-type": "text/html; charset=UTF-8",
-							"Access-Control-Allow-Origin": "*",
-							"Access-Control-Allow-Methods": "GET, OPTIONS",
-							"Access-Control-Allow-Headers": "Content-Type",
+							...corsHeaders,
 							"X-Final-URL": finalUrl, // Include final URL in response header
 						},
 					});
@@ -118,6 +233,7 @@ export default {
 						error instanceof Error ? error.message : String(error);
 					console.error(`[PROXY] Error fetching ${targetUrl}:`, errorMessage);
 
+					const corsHeaders = getCorsHeaders(request, workerOrigin);
 					return new Response(
 						JSON.stringify({
 							error: "Failed to fetch URL",
@@ -127,7 +243,7 @@ export default {
 							status: 500,
 							headers: {
 								"content-type": "application/json",
-								"Access-Control-Allow-Origin": "*",
+								...corsHeaders,
 							},
 						},
 					);
@@ -136,14 +252,10 @@ export default {
 
 			// Handle OPTIONS requests for CORS preflight
 			if (method === "OPTIONS") {
+				const corsHeaders = getCorsHeaders(request, workerOrigin);
 				return new Response(null, {
 					status: 204,
-					headers: {
-						"Access-Control-Allow-Origin": "*",
-						"Access-Control-Allow-Methods": "GET, OPTIONS",
-						"Access-Control-Allow-Headers": "Content-Type",
-						"Access-Control-Max-Age": "86400",
-					},
+					headers: corsHeaders,
 				});
 			}
 

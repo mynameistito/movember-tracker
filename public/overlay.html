@@ -2,19 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=1920, height=1080">
   <title>Movember Donation Progress</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="flex justify-center items-center min-h-screen bg-transparent text-white p-5 font-['Inter',system-ui,sans-serif]">
-  <div class="w-full max-w-6xl px-5" id="overlayContainer">
-    <div class="flex flex-col gap-4 w-full">
-      <div class="flex flex-col md:flex-row md:justify-between md:items-baseline gap-2.5 md:gap-0 w-full">
-        <div class="text-4xl md:text-5xl font-bold tracking-tight whitespace-nowrap text-white transition-opacity duration-300" id="amount">$0</div>
-        <div class="text-xl md:text-2xl font-medium tracking-tight whitespace-nowrap text-gray-400 transition-opacity duration-300" id="target"><span class="text-lg md:text-xl font-normal mr-2">Target:</span>$0</div>
+<body class="absolute inset-0 bg-transparent text-white font-['Inter',system-ui,sans-serif]">
+  <div class="w-[600px] h-[200px] absolute" id="overlayContainer">
+    <div class="flex flex-col gap-4 w-full h-full">
+      <div class="flex flex-row justify-between items-baseline gap-0 w-full">
+        <div class="text-5xl font-bold tracking-tight whitespace-nowrap text-white transition-opacity duration-300" id="amount">$0</div>
+        <div class="text-2xl font-medium tracking-tight whitespace-nowrap text-gray-400 transition-opacity duration-300" id="target"><span class="text-xl font-normal mr-2">Target:</span>$0</div>
       </div>
       <div class="w-full h-[60px] bg-black rounded-full relative overflow-hidden border-2 border-white/20">
         <div class="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-500" id="progressBar" style="width: 0%"></div>
@@ -22,25 +22,69 @@
     </div>
   </div>
   <script type="module">
-    import { DEFAULT_MEMBER_ID } from './js/constants.js';
-    import { getData } from './js/movember-scraper.js';
+    import { DEFAULT_MEMBER_ID, getData, getTeamData } from './js/bundle.js';
 
     const amountElement = document.getElementById('amount');
     const targetElement = document.getElementById('target');
     const progressBar = document.getElementById('progressBar');
+    const overlayContainer = document.getElementById('overlayContainer');
     let currentData = {
       amount: '$0',
       target: '$0',
       percentage: 0
     };
     
-    // Get memberId from URL query parameters
+    // Get memberId or teamId from URL query parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || DEFAULT_MEMBER_ID;
+    const teamId = urlParams.get('teamId') || urlParams.get('teamid');
+    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || (teamId ? null : DEFAULT_MEMBER_ID);
     
-    async function updateData() {
+    // Parse location parameter from URL (case-insensitive), default to bottomright
+    const locationParam = urlParams.get('location');
+    const validLocations = ['topright', 'topleft', 'bottomleft', 'bottomright'];
+    const location = locationParam ? validLocations.find(loc => loc.toLowerCase() === locationParam.toLowerCase()) : null;
+    const position = location || 'bottomright';
+    
+    // Apply positioning classes based on location
+    switch (position) {
+      case 'topright':
+        overlayContainer.classList.add('top-[50px]', 'right-[50px]');
+        break;
+      case 'topleft':
+        overlayContainer.classList.add('top-[50px]', 'left-[50px]');
+        break;
+      case 'bottomleft':
+        overlayContainer.classList.add('bottom-[50px]', 'left-[50px]');
+        break;
+      case 'bottomright':
+      default:
+        overlayContainer.classList.add('bottom-[50px]', 'right-[50px]');
+        break;
+    }
+    
+    // Parse interval from URL query parameter (in seconds), default to 300 seconds (5 minutes)
+    const intervalParam = urlParams.get('interval');
+    const intervalSeconds = intervalParam ? parseInt(intervalParam, 10) : 300;
+    const FRESH_FETCH_INTERVAL = (intervalSeconds > 0 ? intervalSeconds : 300) * 1000; // Convert to milliseconds, default to 5 minutes if invalid
+    let lastFreshFetchTime = null;
+    
+    async function updateData(forceFresh = false) {
       try {
-        const { data } = await getData(memberId);
+        const now = Date.now();
+        // Check if configured interval has passed since last fresh fetch, or if forced
+        const shouldForceFresh = forceFresh || 
+          (lastFreshFetchTime === null) || 
+          (now - lastFreshFetchTime >= FRESH_FETCH_INTERVAL);
+        
+        // Force fresh scrape if needed (grabLive = true)
+        const grabLive = shouldForceFresh;
+        if (grabLive) {
+          lastFreshFetchTime = now;
+        }
+        
+        const { data } = teamId
+          ? await getTeamData(teamId, grabLive)
+          : await getData(memberId, grabLive);
         
         if (data.amount && (data.amount !== currentData.amount || data.target !== currentData.target)) {
           amountElement.classList.add('opacity-70');
@@ -48,7 +92,7 @@
           
           setTimeout(() => {
             amountElement.textContent = data.amount || '$0';
-            targetElement.innerHTML = `<span class="text-lg md:text-xl font-normal mr-2">Target:</span>${data.target || '$0'}`;
+            targetElement.innerHTML = `<span class="text-xl font-normal mr-2">Target:</span>${data.target || '$0'}`;
             const percentage = data.percentage || 0;
             progressBar.style.width = `${Math.min(percentage, 100)}%`;
             currentData = {
@@ -68,11 +112,12 @@
       }
     }
     
-    // Update every 30 seconds (cache is 5 minutes, but we check more frequently)
-    setInterval(updateData, 30000);
+    // Update every 30 seconds (check more frequently than the refresh interval)
+    // The updateData function will automatically force fresh fetch at the configured interval
+    setInterval(() => updateData(false), 30000);
     
-    // Also update immediately on page load after a short delay
-    setTimeout(updateData, 1000);
+    // Also update immediately on page load with fresh fetch (grabLive = true)
+    setTimeout(() => updateData(true), 1000);
   </script>
 </body>
 </html>

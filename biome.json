@@ -12,7 +12,8 @@
 			"!__tests__",
 			"!coverage",
 			"!worker-configuration.d.ts",
-			"!movember-html.html"
+			"!movember-html.html",
+			"!public/js/bundle.js"
 		],
 		"ignoreUnknown": false,
 		"maxSize": 10000000

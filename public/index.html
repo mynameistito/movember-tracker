@@ -109,12 +109,30 @@
     <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
       <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">Live Data Display</h2>
       <div class="my-5">
-        <label for="memberId" class="block text-gray-300 mb-2 font-medium">Member ID:</label>
+        <label class="block text-gray-300 mb-3 font-medium">Type:</label>
+        <div class="flex gap-4 mb-5">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="pageType" value="member" id="pageTypeMember" checked class="w-4 h-4 text-green-500 bg-white/10 border-white/20 focus:ring-green-500 focus:ring-2">
+            <span class="text-gray-300">Member</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="pageType" value="team" id="pageTypeTeam" class="w-4 h-4 text-green-500 bg-white/10 border-white/20 focus:ring-green-500 focus:ring-2">
+            <span class="text-gray-300">Team</span>
+          </label>
+        </div>
+        <label for="memberId" id="idLabel" class="block text-gray-300 mb-2 font-medium">Member ID:</label>
         <input type="text" id="memberId" placeholder="Enter member ID (default: 14810348)" value="14810348" class="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white text-base font-inherit focus:outline-none focus:border-green-500 transition-colors">
       </div>
       <div class="flex flex-wrap gap-3 mb-5">
         <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="fetchButton" onclick="fetchData()">Fetch Data</button>
         <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="refreshButton" onclick="fetchData(true)">Force Refresh</button>
+        <label for="overlayLocation" class="flex items-center gap-2 text-gray-300 font-medium">Position:</label>
+        <select id="overlayLocation" class="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-base font-inherit focus:outline-none focus:border-green-500 transition-colors">
+          <option value="bottomright">Bottom Right</option>
+          <option value="bottomleft">Bottom Left</option>
+          <option value="topright">Top Right</option>
+          <option value="topleft">Top Left</option>
+        </select>
         <button class="bg-gradient-to-b from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold text-base cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" id="copyOverlayButton" onclick="copyOverlayUrl()">Copy Overlay URL</button>
       </div>
       <div id="dataDisplay"></div>
@@ -138,6 +156,13 @@
       <div class="bg-black border-l-4 border-green-500 p-3 my-3 rounded font-mono text-sm text-white break-all">
         <span class="text-green-500 font-semibold mr-2">GET</span><span id="baseUrl">/json</span>
       </div>
+      <p class="text-gray-300 mb-4 text-base">
+        Use <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId</code> for member pages or <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">teamId</code> for team pages:
+      </p>
+      <ul class="list-none pl-0 mb-4">
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/json?memberId=12345678</code> - Get member data</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/json?teamId=2494795</code> - Get team data</li>
+      </ul>
       
       <h3 class="text-xl font-semibold text-white mt-6 mb-3">Response Format</h3>
       <div class="bg-black border border-white/10 rounded-lg p-5 my-4 overflow-x-auto font-mono text-sm leading-relaxed text-gray-200">
@@ -161,13 +186,32 @@
         The overlay displays the current donation amount, target, and a visual progress bar. 
         It automatically updates every 30 seconds and has a transparent background, making it perfect for OBS browser sources or stream overlays.
       </p>
+      <p class="text-gray-300 mb-4 text-base">
+        Use <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId</code> for member pages or <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">teamId</code> for team pages:
+      </p>
+      <ul class="list-none pl-0 mb-4">
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/overlay?memberId=12345678</code> - Member overlay</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/overlay?teamId=2494795</code> - Team overlay</li>
+      </ul>
+      <p class="text-gray-300 mb-4 text-base">
+        You can also specify the overlay position using the <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location</code> parameter. Valid values are:
+      </p>
+      <ul class="list-none pl-0">
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=bottomright</code> - Bottom right corner (default)</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=bottomleft</code> - Bottom left corner</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=topright</code> - Top right corner</li>
+        <li class="text-gray-300 mb-2 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold"><code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">location=topleft</code> - Top left corner</li>
+      </ul>
+      <p class="text-gray-300 mb-4 text-base">
+        Example: <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/overlay?memberId=12345678&location=topright</code>
+      </p>
     </section>
 
     <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
-      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">Using the memberId Parameter</h2>
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">Using the memberId and teamId Parameters</h2>
       <p class="text-gray-300 mb-4 text-base">
-        Track any Movember member by adding the <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId</code> query parameter to your URLs. 
-        Each member ID has its own cache, so different members' data won't interfere with each other.
+        Track any Movember member or team by adding the <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId</code> or <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">teamId</code> query parameter to your URLs. 
+        Each member/team ID has its own cache, so different members' and teams' data won't interfere with each other.
       </p>
 
       <h3 class="text-xl font-semibold text-white mt-6 mb-3">Finding Your Movember Member ID</h3>
@@ -176,6 +220,29 @@
         <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">The number after <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">memberId=</code> in the URL is your member ID</li>
         <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Use that ID in the query parameter when accessing the API</li>
       </ul>
+
+      <h3 class="text-xl font-semibold text-white mt-6 mb-3">Finding Your Movember Team ID</h3>
+      <ul class="list-none pl-0">
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Go to your Movember team page (e.g., <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">https://nz.movember.com/team/2494795</code>)</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">The number after <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">/team/</code> in the URL is your team ID</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Use that ID with the <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">teamId</code> query parameter when accessing the API</li>
+      </ul>
+    </section>
+
+    <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
+      <h2 class="text-2xl md:text-3xl font-semibold text-white mb-5 flex items-center gap-3 before:content-[''] before:w-1 before:h-7 before:bg-gradient-to-b before:from-green-500 before:to-green-600 before:rounded-sm">Team Page Support</h2>
+      <p class="text-gray-300 mb-4 text-base">
+        This service supports both Movember member pages and team pages. Team pages use the same data structure as member pages (raised amount, target, percentage), but are accessed via different URLs.
+      </p>
+      <p class="text-gray-300 mb-4 text-base">
+        <strong>Member pages:</strong> <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">https://{subdomain}.movember.com/donate/details?memberId={id}</code>
+      </p>
+      <p class="text-gray-300 mb-4 text-base">
+        <strong>Team pages:</strong> <code class="bg-black/50 px-1.5 py-0.5 rounded text-green-500 font-mono text-sm">https://{subdomain}.movember.com/team/{id}</code>
+      </p>
+      <p class="text-gray-300 mb-4 text-base">
+        Team and member data are cached separately, so you can track both without conflicts. Use the toggle above to switch between Member and Team modes.
+      </p>
     </section>
 
     <section class="bg-white/5 rounded-xl p-6 md:p-8 mb-8 border border-white/10">
@@ -184,33 +251,74 @@
         <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">The client-side JavaScript fetches Movember page HTML using the Worker's CORS proxy</li>
         <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Parses the HTML using regex patterns to extract donation amounts</li>
         <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Results are cached in localStorage for 5 minutes to avoid excessive requests</li>
-        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Automatically detects the correct Movember subdomain</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Automatically detects the correct Movember subdomain for both members and teams</li>
         <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Subdomain mappings are cached in localStorage for 24 hours for optimal performance</li>
+        <li class="text-gray-300 mb-3 pl-6 relative before:content-['→'] before:absolute before:left-0 before:text-green-500 before:font-bold">Member and team data are cached separately with proper namespacing</li>
       </ul>
     </section>
   </div>
 
   <script type="module">
-    import { DEFAULT_MEMBER_ID } from './js/constants.js';
-    import { getData } from './js/movember-scraper.js';
+    import { DEFAULT_MEMBER_ID, getData, getTeamData } from './js/bundle.js';
 
     // Set base URLs
     const baseUrl = window.location.origin;
     document.getElementById('baseUrl').textContent = `${baseUrl}/json`;
     document.getElementById('overlayUrl').textContent = `${baseUrl}/overlay`;
 
-    // Get memberId from URL or use default
-    function getMemberId() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const memberId = urlParams.get('memberId') || urlParams.get('memberid') || 
-                       document.getElementById('memberId').value || DEFAULT_MEMBER_ID;
-      return memberId;
+    // Get page type (member or team) from radio buttons
+    function getPageType() {
+      const teamRadio = document.getElementById('pageTypeTeam');
+      if (teamRadio instanceof HTMLInputElement && teamRadio.checked) {
+        return 'team';
+      }
+      return 'member';
     }
+
+    // Update label based on page type
+    function updateLabel() {
+      const pageType = getPageType();
+      const label = document.getElementById('idLabel');
+      const input = document.getElementById('memberId');
+      if (pageType === 'team') {
+        label.textContent = 'Team ID:';
+        input.placeholder = 'Enter team ID (e.g., 2494795)';
+      } else {
+        label.textContent = 'Member ID:';
+        input.placeholder = 'Enter member ID (default: 14810348)';
+      }
+    }
+
+    // Add event listeners to radio buttons
+    document.getElementById('pageTypeMember')?.addEventListener('change', updateLabel);
+    document.getElementById('pageTypeTeam')?.addEventListener('change', updateLabel);
+    
+    // Initialize label on page load
+    updateLabel();
+
+    // Get ID from URL or use default
+    function getId() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const pageType = getPageType();
+      
+      if (pageType === 'team') {
+        return urlParams.get('teamId') || urlParams.get('teamid') || 
+               document.getElementById('memberId').value || '';
+      } else {
+        return urlParams.get('memberId') || urlParams.get('memberid') || 
+               document.getElementById('memberId').value || DEFAULT_MEMBER_ID;
+      }
+    }
+
 
     // Copy overlay URL to clipboard
     window.copyOverlayUrl = async () => {
-      const memberId = getMemberId();
-      const overlayUrl = `${baseUrl}/overlay?memberId=${memberId}`;
+      const pageType = getPageType();
+      const id = getId();
+      const paramName = pageType === 'team' ? 'teamId' : 'memberId';
+      const locationSelect = document.getElementById('overlayLocation');
+      const location = locationSelect ? locationSelect.value : 'bottomright';
+      const overlayUrl = `${baseUrl}/overlay?${paramName}=${id}&location=${location}`;
       const copyButton = document.getElementById('copyOverlayButton');
       const originalText = copyButton.textContent;
 
@@ -282,14 +390,15 @@
 
     // Fetch and display data
     window.fetchData = async (forceRefresh = false) => {
-      const memberId = getMemberId();
+      const pageType = getPageType();
+      const id = getId();
       const displayDiv = document.getElementById('dataDisplay');
       const fetchButton = document.getElementById('fetchButton');
       const refreshButton = document.getElementById('refreshButton');
       const copyOverlayButton = document.getElementById('copyOverlayButton');
 
       // Update input field
-      document.getElementById('memberId').value = memberId;
+      document.getElementById('memberId').value = id;
 
       // Disable buttons
       fetchButton.disabled = true;
@@ -298,7 +407,9 @@
       displayDiv.innerHTML = '<div class="text-green-500 italic">Loading...</div>';
 
       try {
-        const { data, cacheStatus } = await getData(memberId, forceRefresh);
+        const { data, cacheStatus } = pageType === 'team' 
+          ? await getTeamData(id, forceRefresh)
+          : await getData(id, forceRefresh);
         
         displayDiv.innerHTML = `
           <div class="bg-green-500/10 border-l-4 border-green-500 p-5 my-5 rounded">
@@ -361,14 +472,17 @@
     // Auto-update overlay display every 30 seconds
     let overlayUpdateInterval = null;
     async function updateOverlayData() {
-      const memberId = getMemberId();
+      const pageType = getPageType();
+      const id = getId();
       const amountElement = document.getElementById('overlayAmount');
       
       // Only update if overlay elements exist
       if (!amountElement) return;
       
       try {
-        const { data } = await getData(memberId);
+        const { data } = pageType === 'team'
+          ? await getTeamData(id)
+          : await getData(id);
         updateOverlayElements(data);
       } catch (error) {
         console.error('Failed to update overlay data:', error);
@@ -391,9 +505,15 @@
       }
     }
 
-    // Auto-fetch on page load if memberId is in URL
+    // Auto-fetch on page load if memberId or teamId is in URL
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('memberId') || urlParams.has('memberid')) {
+    if (urlParams.has('memberId') || urlParams.has('memberid') || urlParams.has('teamId') || urlParams.has('teamid')) {
+      // Set page type based on URL parameter
+      if (urlParams.has('teamId') || urlParams.has('teamid')) {
+        const teamRadio = document.getElementById('pageTypeTeam');
+        if (teamRadio) teamRadio.checked = true;
+        updateLabel();
+      }
       window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => window.fetchData(), 500);
       });

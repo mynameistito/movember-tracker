@@ -1,5 +1,7 @@
 // Simple static file server for client-side application
 
+import { generateOverlayHTML } from "./htmlGenerator";
+
 // Rate limiting: Simple in-memory store (resets on worker restart)
 // In production, consider using Cloudflare KV or Durable Objects for persistence
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
@@ -142,6 +144,7 @@ export default {
 				}
 
 				// Origin validation: Only allow requests from the same Worker domain
+				// In local development, allow localhost origins
 				const requestOrigin = request.headers.get("Origin");
 				const referer = request.headers.get("Referer");
 
@@ -154,10 +157,24 @@ export default {
 					}
 				}
 
-				if (
-					!requestOriginToCheck ||
-					requestOriginToCheck.toLowerCase() !== workerOrigin.toLowerCase()
-				) {
+				// Check if we're in local development (localhost or 127.0.0.1)
+				const isLocalDev =
+					workerOrigin.includes("localhost") ||
+					workerOrigin.includes("127.0.0.1") ||
+					workerOrigin.includes("::1");
+
+				// Allow if:
+				// 1. Origin matches worker origin exactly, OR
+				// 2. We're in local dev and both are localhost/127.0.0.1
+				const originMatches =
+					requestOriginToCheck &&
+					(requestOriginToCheck.toLowerCase() === workerOrigin.toLowerCase() ||
+						(isLocalDev &&
+							(requestOriginToCheck.includes("localhost") ||
+								requestOriginToCheck.includes("127.0.0.1") ||
+								requestOriginToCheck.includes("::1"))));
+
+				if (!originMatches) {
 					const corsHeaders = getCorsHeaders(request, workerOrigin);
 					return new Response(JSON.stringify({ error: "Origin not allowed" }), {
 						status: 403,
@@ -269,13 +286,22 @@ export default {
 					},
 				});
 			} else if (pathname === "/overlay") {
-				// Redirect to overlay HTML page
-				return new Response(null, {
-					status: 302,
-					headers: {
-						Location: `/overlay.html${url.search ? url.search : ""}`,
-					},
-				});
+				// Generate overlay HTML server-side
+				try {
+					const html = generateOverlayHTML();
+					return new Response(html, {
+						headers: {
+							"Content-Type": "text/html; charset=UTF-8",
+						},
+					});
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : "Unknown error";
+					return new Response(`Error: ${errorMessage}`, {
+						status: 500,
+						headers: { "Content-Type": "text/plain" },
+					});
+				}
 			} else if (pathname === "/") {
 				// Redirect to main index page
 				return new Response(null, {

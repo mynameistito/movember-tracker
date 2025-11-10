@@ -32,7 +32,7 @@
 		"@cloudflare/workers-types": "^4.20251109.0",
 		"@vitest/coverage-v8": "^4.0.8",
 		"@vitest/ui": "^4.0.8",
-		"esbuild": "^0.25.12",
+		"esbuild": "^0.27.0",
 		"happy-dom": "^20.0.10",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.8",

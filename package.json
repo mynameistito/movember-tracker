@@ -19,7 +19,7 @@
     "check": "ultracite check",
     "fix": "ultracite fix",
     "build:js": "esbuild src/client/movember-scraper.ts --bundle --minify --sourcemap --outfile=public/js/bundle.js --format=esm --target=es2020 && esbuild src/client/setup.ts src/client/overlay.ts --bundle --minify --outdir=public/js --format=esm --target=es2020",
-    "build": "npm run build:js",
+    "build": "bun run build:js",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",

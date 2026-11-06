@@ -51,7 +51,7 @@ The proxy answers OPTIONS before target validation, follows at most five redirec
 
 ## Before a stream
 
-Local verification on 6 November 2026 passed 103 tests, typechecks, lint, a Worker packaging dry run, and controlled Chromium checks for member/team previews and mobile layout. Live fetching of member 14810348 and team 2494795 returned HTTP 403 from Movember in this environment. Successful live totals are still unverified; complete the checks below from the intended deployment before using the overlay on stream.
+Local verification on 6 November 2026 passed 110 tests, typechecks, lint, a Worker packaging dry run, and controlled Chromium checks for member/team previews and mobile layout. Live fetching of member 14810348 and team 2494795 returned HTTP 403 from Movember in this environment. Successful live totals are still unverified; complete the checks below from the intended deployment before using the overlay on stream.
 
 1. Compare the member and team preview totals with their Movember pages.
 2. Copy the overlay URL into OBS and confirm position, transparency, and currency.

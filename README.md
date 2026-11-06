@@ -1,151 +1,61 @@
-# Movember Donation Scraper (Very WIP)
+# Movember stream tracker
 
-A Cloudflare Worker that automatically tracks your Movember donation progress. This tool fetches and parses your Movember donation page HTML to extract donation data, providing it in a format perfect for stream overlays or websites.
+A browser-based donation tracker for Movember members and teams, with a transparent OBS overlay. The Cloudflare Worker serves the app and proxies Movember HTML; scraping and refresh run in the open browser source. There is no scheduled Worker job or shared server-side donation cache.
 
-## What This Does
+## Run locally
 
-This project creates a Cloudflare Worker that automatically checks your Movember donation page every 5 minutes and stores the current donation amount. You can then access this information through a simple web link that returns the data in a format that's easy to use in stream overlays, websites, or other applications.
+Install Bun, then:
 
-## Quick Setup
-
-### Step 1: Fork This Repository
-
-1. Click the **"Fork"** button at the top of this page
-2. This creates your own copy of the repository
-
-### Step 2: Connect to Cloudflare Workers
-
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Sign up or log in (free tier works great!)
-3. Click **"Workers & Pages"** in the sidebar
-4. Click **"Create application"**
-5. Click **"Connect to Git"**
-6. Select your GitHub account and choose your forked repository
-7. Click **"Begin setup"**
-
-### Step 3: Configure Your Worker
-
-1. **Worker name:** Choose a name (e.g., `my-movember-tracker`)
-2. **Production branch:** Select `main` (or `master`)
-3. **Build command:** Leave empty (or use `npm install` if needed)
-4. **Root directory:** Leave as `/`
-5. Click **"Save and Deploy"**
-
-## Using Your Worker
-
-Once deployed, your Worker will be available at:
-
-- **Main page:** `https://your-worker-name.your-subdomain.workers.dev`
-- **JSON data:** `https://your-worker-name.your-subdomain.workers.dev/json`
-
-### Using the memberId and teamId Parameters
-
-You can track any Movember member or team by adding the `memberId` or `teamId` query parameter to your URLs:
-
-**Examples:**
-
-- Default member (14810348): `https://your-worker-name.your-subdomain.workers.dev`
-- Specific member: `https://your-worker-name.your-subdomain.workers.dev?memberId=12345678`
-- JSON for specific member: `https://your-worker-name.your-subdomain.workers.dev/json?memberId=12345678`
-- Specific team: `https://your-worker-name.your-subdomain.workers.dev?teamId=2494795`
-- JSON for specific team: `https://your-worker-name.your-subdomain.workers.dev/json?teamId=2494795`
-
-**To find your Movember member ID:**
-
-1. Go to your Movember donation page (e.g., `https://au.movember.com/donate/details?memberId=YOUR_ID`)
-2. The number after `memberId=` in the URL is your member ID
-3. Use that ID in the query parameter when accessing the Worker
-
-**To find your Movember team ID:**
-
-1. Go to your Movember team page (e.g., `https://nz.movember.com/team/2494795`)
-2. The number after `/team/` in the URL is your team ID
-3. Use that ID with the `teamId` query parameter when accessing the Worker
-
-Each member/team ID has its own cache, so different members' and teams' data won't interfere with each other.
-
-### Subdomain Support
-
-Different Movember members and teams may use different subdomains (e.g., `fr.movember.com`, `au.movember.com`, etc.). **The Worker automatically detects the correct subdomain by following redirects** - no manual configuration needed!
-
-**How it works:**
-
-1. When a member or team ID is first requested, the Worker tries the default subdomain (`au.movember.com`)
-2. If Movember redirects to a different subdomain, the Worker detects and caches it
-3. The detected subdomain is cached for 24 hours to avoid repeated detection
-4. Subsequent requests use the cached subdomain for faster performance
-5. Member and team subdomain mappings are cached separately
-
-**Manual overrides (optional):** If you need to manually override a subdomain mapping, you can edit `src/index.ts` and add entries to the `MEMBER_SUBDOMAIN_MAP`:
-
-```typescript
-const MEMBER_SUBDOMAIN_MAP: Record<string, string> = {
-  "15023456": "fr", // Manual override for member 15023456
-  // Add more overrides if needed
-};
+```sh
+bun install
+bun run build
+bunx wrangler dev
 ```
 
-Manual overrides take precedence over auto-detection and are also cached.
+Open the local URL printed by Wrangler. Choose a member or team, enter its numeric Movember ID, preview the overlay, and copy the URL into an OBS Browser source. Use a 1920 × 1080 source. The setup preview fetches real donation data.
 
-### JSON Response Format
+## Overlay URLs
 
-```json
-{
-  "amount": "$2,500",
-  "currency": "AUD",
-  "target": "$10,000",
-  "percentage": 25,
-  "timestamp": 1704067200000
-}
+```text
+/overlay?memberId=14810348&location=bottomright&interval=300
+/overlay?teamId=2494795&location=bottomleft&interval=60
 ```
 
-### Team Page Support
+`teamId` selects team tracking; otherwise `memberId` selects a member, defaulting to 14810348. `location` accepts topleft, topright, bottomleft, or bottomright. Refresh intervals are seconds, bounded to 30–3600, with a five-minute default. Keep the OBS Browser source active to keep refreshing; browser/OBS suspension can pause it.
 
-This service supports both Movember member pages and team pages:
+TanStack Query owns overlay polling and bounded retries. Effect owns the fresh tracking operation and typed failures. Validated localStorage snapshots survive reloads and are isolated by member/team and ID. A refresh failure keeps the last successful total visible. On a first-load failure, the overlay displays an unavailable message and continues trying. The subdomain routing cache expires after 24 hours; donation snapshots use a five-minute TTL. Movember markup can change, so check the preview against the fundraiser page before a stream.
 
-- **Member pages:** `https://{subdomain}.movember.com/donate/details?memberId={id}`
-- **Team pages:** `https://{subdomain}.movember.com/team/{id}`
+`/json` opens a browser-rendered data viewer. It is HTML that runs JavaScript, **not a JSON HTTP API**. External programs should not treat it as an application/json endpoint.
 
-Team pages use the same data structure as member pages (raised amount, target, percentage), but are accessed via different URLs. Team and member data are cached separately with proper namespacing, so you can track both without conflicts.
+## Deploy
 
-## How It Works
+```sh
+bun run build
+bunx wrangler deploy
+```
 
-- The Worker fetches your Movember page HTML directly using `fetch()`
-- Parses the HTML using regex patterns to extract donation amounts from CSS classes
-- Results are cached for 5 minutes to avoid excessive requests
-- Supports both member pages (`/donate/details?memberId=`) and team pages (`/team/`)
-- Member and team data are cached separately with proper namespacing
-- Much faster and more cost-effective than browser rendering
+Wrangler uploads the Worker and the `public` assets. Build before deploying so generated browser bundles match source. No credentials belong in this repository; authenticate Wrangler through your Cloudflare account. Deployment is a separate action from local validation.
 
-## Troubleshooting
+## Development checks
 
-**Worker shows errors:**
+```sh
+bun run typecheck
+bun run test --run
+bun run check
+bun run build
+```
 
-- Check the **"Logs"** tab in your Worker dashboard
-- If you see "Could not find raised amount in HTML", the page structure may have changed or requires JavaScript execution
+`bun run fix` runs Ultracite using Oxlint and Oxfmt. Generated files under `public/js` are excluded from linting. Browser and Worker TypeScript environments are checked separately. Tests import source modules rather than generated bundles.
 
-**Wrong donation amount:**
+The proxy answers OPTIONS before target validation, follows at most five redirects, validates HTTPS Movember destinations on every hop, and applies a 15-second request timeout. It is intended for same-origin browser use and includes per-isolate rate limiting; that limit is not a distributed quota.
 
-- The Worker caches data for 5 minutes - wait a bit and try again
-- Double-check that the `memberId` or `teamId` parameter matches your Movember ID
-- You can force a fresh scrape by adding `&grab-live=true` to the URL
+## Before a stream
 
-**Team page not working:**
+Local verification on 6 November 2026 passed 103 tests, typechecks, lint, a Worker packaging dry run, and controlled Chromium checks for member/team previews and mobile layout. Live fetching of member 14810348 and team 2494795 returned HTTP 403 from Movember in this environment. Successful live totals are still unverified; complete the checks below from the intended deployment before using the overlay on stream.
 
-- Make sure you're using the `teamId` parameter (not `memberId`) for team pages
-- Verify the team URL format: `https://{subdomain}.movember.com/team/{id}`
-- Check that the team ID is correct by visiting the team page directly
+1. Compare the member and team preview totals with their Movember pages.
+2. Copy the overlay URL into OBS and confirm position, transparency, and currency.
+3. Leave it running through a refresh and confirm the total updates.
+4. Temporarily disconnect networking and confirm the last total stays visible, then reconnect and confirm recovery.
 
-**Need to change the default member ID:**
-
-- Edit `src/index.ts` in your GitHub repository
-- Find `const DEFAULT_MEMBER_ID = "14810348";` and change the ID
-- Cloudflare will automatically redeploy when you commit changes
-
-## License
-
-MIT
-
-## Credits
-
-Made with AI.
+See [architecture notes](docs/architecture.md) for module ownership and the verification limits.

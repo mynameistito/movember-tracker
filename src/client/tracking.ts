@@ -2,8 +2,20 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import { setCachedData } from "./cache.js";
 import { CACHE_TTL } from "./constants.js";
+import { ProxyRequestError } from "./scraper/network.js";
 import { scrapeMovemberPage, scrapeTeamPage } from "./scraper/orchestrator.js";
 import type { ScrapedData } from "./scraper/orchestrator.js";
+
+const isRetryable = (cause: unknown): boolean => {
+  if (cause instanceof ProxyRequestError) {
+    return cause.status === 408 || cause.status === 429 || cause.status >= 500;
+  }
+
+  return (
+    cause instanceof TypeError ||
+    (cause instanceof DOMException && cause.name === "TimeoutError")
+  );
+};
 
 /** A member or team whose donation progress is being tracked. */
 export interface TrackingInput {
@@ -16,6 +28,7 @@ export class TrackingError extends Schema.TaggedError<TrackingError>()(
   "TrackingError",
   {
     message: Schema.String,
+    retryable: Schema.Boolean,
   }
 ) {}
 
@@ -41,6 +54,7 @@ export const trackingLayer = Layer.sync(Tracking, () => {
           : await scrapeMovemberPage(input.id, true, signal),
       catch: (cause) =>
         new TrackingError({
+          retryable: isRetryable(cause),
           message:
             cause instanceof Error ? cause.message : "Donation refresh failed",
         }),

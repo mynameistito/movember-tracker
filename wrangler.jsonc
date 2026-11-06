@@ -2,7 +2,7 @@
   "name": "movember-tracker",
   "main": "src/index.ts",
   "compatibility_date": "2024-09-15",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
   "minify": true,
   "assets": {
     "directory": "./public",

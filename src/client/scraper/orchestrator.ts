@@ -82,12 +82,17 @@ const scrapeFundraiser = async (
   signal?: AbortSignal
 ): Promise<ScrapedData> => {
   const started = Date.now();
+  let subdomain: string | undefined;
+  let url: string | undefined;
 
   try {
     const country =
       type === "team"
         ? await getSubdomainForTeam(id, signal)
         : await getSubdomainForMember(id, signal);
+
+    subdomain = country;
+    url = fundraiserUrl(type, id, country);
 
     const { html, finalUrl } = await loadFundraiser(
       type,
@@ -97,7 +102,8 @@ const scrapeFundraiser = async (
       signal
     );
 
-    const subdomain = extractSubdomainFromUrl(finalUrl) ?? country;
+    subdomain = extractSubdomainFromUrl(finalUrl) ?? country;
+    url = finalUrl;
     setCachedSubdomain(type, id, subdomain, SUBDOMAIN_CACHE_TTL);
 
     const { raised, target } = extractAmounts(html, id, subdomain);
@@ -126,6 +132,8 @@ const scrapeFundraiser = async (
 
     return data;
   } catch (caughtError) {
+    signal?.throwIfAborted();
+
     const error =
       caughtError instanceof Error
         ? caughtError
@@ -133,6 +141,8 @@ const scrapeFundraiser = async (
 
     trackScrapingError(error, {
       memberId: id,
+      subdomain,
+      url,
       metadata: { duration: Date.now() - started, type },
     });
 

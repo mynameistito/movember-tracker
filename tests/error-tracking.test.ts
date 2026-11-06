@@ -10,15 +10,15 @@ describe("persisted error log", () => {
     localStorage.clear();
   });
 
-  it("recovers from a malformed persisted log", () => {
-    localStorage.setItem(
-      "error_tracking_log",
-      JSON.stringify([{ message: 12 }])
-    );
-    expect(getRecentErrors()).toStrictEqual([]);
-    trackNetworkError(new Error("Request failed"));
-    expect(getRecentErrors()).toHaveLength(1);
-  });
+  it.each(["not JSON", JSON.stringify([{ message: 12 }])])(
+    "recovers from a malformed persisted log: %s",
+    (stored) => {
+      localStorage.setItem("error_tracking_log", stored);
+      expect(getRecentErrors()).toStrictEqual([]);
+      trackNetworkError(new Error("Request failed"));
+      expect(getRecentErrors()).toHaveLength(1);
+    }
+  );
 
   it("redacts sensitive content and isolates persisted records", () => {
     trackNetworkError(new Error("Request failed for user@example.com"), {

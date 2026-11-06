@@ -63,13 +63,19 @@ const persistedErrorSchema = Schema.Struct({
 });
 
 const readErrorLog = (): ErrorInfo[] => {
-  const stored: unknown = JSON.parse(localStorage.getItem(errorLogKey) ?? "[]");
+  try {
+    const stored: unknown = JSON.parse(
+      localStorage.getItem(errorLogKey) ?? "[]"
+    );
 
-  const decoded = Schema.decodeUnknownOption(
-    Schema.Array(persistedErrorSchema)
-  )(stored);
+    const decoded = Schema.decodeUnknownOption(
+      Schema.Array(persistedErrorSchema)
+    )(stored);
 
-  return [...Option.getOrElse(decoded, () => [])];
+    return [...Option.getOrElse(decoded, () => [])];
+  } catch {
+    return [];
+  }
 };
 
 /**

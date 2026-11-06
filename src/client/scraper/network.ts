@@ -113,7 +113,8 @@ export const fetchViaProxy = async (
     trackNetworkError(error, {
       url,
       metadata: {
-        status: response.status,
+        status,
+        proxyStatus: response.status,
         statusText: response.statusText,
       },
     });

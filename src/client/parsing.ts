@@ -1,3 +1,4 @@
+/* oxlint-disable unicorn/prefer-string-replace-all -- Browser bundles target ES2020, which lacks replaceAll. */
 import { getCurrencyFromSubdomain } from "./constants.js";
 
 /** Numeric text and the currency selected by the fundraiser's country. */
@@ -33,7 +34,7 @@ export const parseAmount = (
   // Extract amount (supports numbers with commas and optional decimals)
   // Remove currency symbols and codes before extracting number
   const cleanedForAmount = cleaned
-    .replaceAll(/[$€£¥]|\b(?:USD|EUR|GBP|AUD|JPY|CAD|NZD|ZAR)\b/giu, "")
+    .replace(/[$€£¥]|\b(?:USD|EUR|GBP|AUD|JPY|CAD|NZD|ZAR)\b/giu, "")
     .trim();
 
   const amountMatch = /[\d,]+\.?\d*/u.exec(cleanedForAmount);
@@ -59,7 +60,7 @@ export const isValidNumber = (value: string | null | undefined): boolean => {
   }
 
   // Remove commas, spaces, and currency symbols, then check if we have at least one digit
-  const cleaned = value.replaceAll(/[,.\s$€£¥]/gu, "");
+  const cleaned = value.replace(/[,.\s$€£¥]/gu, "");
 
   // Must have at least one digit and be a valid number
   if (!cleaned || cleaned.length === 0 || !/^\d+$/u.test(cleaned)) {
@@ -89,8 +90,9 @@ export const isValidNumber = (value: string | null | undefined): boolean => {
  * calculatePercentage("500", "1,000") // 50
  */
 export const calculatePercentage = (raised: string, target: string): number => {
-  const raisedNum = Number(raised.replaceAll(",", ""));
-  const targetNum = Number(target.replaceAll(",", ""));
+  /* oxlint-disable unicorn/prefer-number-coercion -- Preserve numeric-prefix parsing and NaN for empty input. */
+  const raisedNum = Number.parseFloat(raised.replace(/,/gu, ""));
+  const targetNum = Number.parseFloat(target.replace(/,/gu, ""));
 
   if (targetNum === 0) {
     return 0;

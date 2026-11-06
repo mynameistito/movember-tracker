@@ -18,10 +18,16 @@ const mount = (): void => {
   }
 
   const params = new URLSearchParams(location.search);
-  const teamId = params.get("teamId") ?? params.get("teamid");
+
+  const teamId =
+    [params.get("teamId"), params.get("teamid")].find(
+      (value) => value !== null && value !== ""
+    ) ?? null;
 
   const memberId =
-    params.get("memberId") ?? params.get("memberid") ?? DEFAULT_MEMBER_ID;
+    [params.get("memberId"), params.get("memberid")].find(
+      (value) => value !== null && value !== ""
+    ) ?? DEFAULT_MEMBER_ID;
 
   const id = teamId ?? memberId;
   const position = params.get("location")?.toLowerCase() ?? "bottomright";

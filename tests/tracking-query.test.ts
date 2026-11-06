@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getCachedData } from "../src/client/cache";
 import type { CachedData } from "../src/client/cache";
+import { getRecentErrors } from "../src/client/error-tracking";
 import { observeTracking } from "../src/client/tracking-query";
 
 const html =
@@ -12,6 +13,75 @@ describe("tracking query", () => {
   afterEach(() => {
     localStorage.clear();
     vi.unstubAllGlobals();
+  });
+
+  it("reports terminal access failures without retrying the request", async () => {
+    const network = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json(
+          { message: "Forbidden", upstreamStatus: 403 },
+          { status: 502 }
+        )
+      );
+
+    vi.stubGlobal("fetch", network);
+
+    const listener =
+      vi.fn<(data: CachedData | undefined, failed: boolean) => void>();
+
+    const dispose = observeTracking(
+      { type: "member", id: "403456" },
+      300_000,
+      listener
+    );
+
+    try {
+      expect(listener).toHaveBeenCalledOnce();
+      await vi.waitFor(() => {
+        expect(listener).toHaveBeenLastCalledWith(undefined, true);
+      });
+      expect(network).toHaveBeenCalledOnce();
+    } finally {
+      dispose();
+    }
+  });
+
+  it("retries a transient network failure and publishes the recovered snapshot", async () => {
+    const network = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockImplementation(
+        async () =>
+          await Promise.resolve(
+            new Response(html, {
+              headers: { "X-Final-URL": "https://nz.movember.com/team/456" },
+            })
+          )
+      );
+
+    vi.stubGlobal("fetch", network);
+
+    const listener =
+      vi.fn<(data: CachedData | undefined, failed: boolean) => void>();
+
+    const dispose = observeTracking(
+      { type: "team", id: "456" },
+      300_000,
+      listener
+    );
+
+    try {
+      await vi.waitFor(
+        () => {
+          expect(getCachedData("team", "456")?.amount).toBe("$1,250");
+        },
+        { timeout: 3000 }
+      );
+      expect(network).toHaveBeenCalledTimes(3);
+    } finally {
+      dispose();
+    }
   });
 
   it("aborts a pending scrape when its observer is disposed", async () => {
@@ -44,6 +114,7 @@ describe("tracking query", () => {
         expect(requestSignal?.aborted).toBeTruthy();
       });
       expect(network).toHaveBeenCalledOnce();
+      expect(getRecentErrors()).toStrictEqual([]);
       expect(getCachedData("member", "cancel123")).toBeNull();
     } finally {
       dispose();

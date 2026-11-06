@@ -75,7 +75,7 @@ const extractFromDOM = (
 
     return scriptAmount(document, patterns);
   } catch (error) {
-    logger.debug("[SCRAPE]", "DOM parsing failed; using text patterns", error);
+    logger.warn("[SCRAPE]", "DOM parsing failed; using text patterns", error);
 
     return "";
   }

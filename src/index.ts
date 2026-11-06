@@ -120,7 +120,10 @@ const proxy = async (request: Request, url: URL): Promise<Response> => {
   }
 
   try {
-    const { html, finalUrl } = await fetchMovemberPage(destination.href);
+    const { html, finalUrl } = await fetchMovemberPage(
+      destination.href,
+      request.signal
+    );
 
     return new Response(html, {
       headers: {
@@ -130,6 +133,8 @@ const proxy = async (request: Request, url: URL): Promise<Response> => {
       },
     });
   } catch (error) {
+    console.error("Movember proxy request failed", error);
+
     const message =
       error instanceof Error ? error.message : "Movember request failed";
 
@@ -178,7 +183,9 @@ export default {
     if (env.ASSETS) {
       try {
         return await env.ASSETS.fetch(request);
-      } catch {
+      } catch (error) {
+        console.error("Asset fetch failed", error);
+
         return new Response("Assets temporarily unavailable", { status: 503 });
       }
     }

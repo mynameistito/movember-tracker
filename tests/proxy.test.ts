@@ -9,6 +9,22 @@ describe("Movember proxy", () => {
     vi.unstubAllGlobals();
   });
 
+  it("passes caller cancellation to the upstream request", async () => {
+    const caller = new AbortController();
+    let upstream: AbortSignal | null | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockImplementation(async (_url, options) => {
+        upstream = options?.signal;
+
+        return await Promise.resolve(new Response("page"));
+      })
+    );
+    await fetchMovemberPage("https://nz.movember.com/team/123", caller.signal);
+    caller.abort();
+    expect(upstream?.aborted).toBeTruthy();
+  });
+
   it("bounds redirect chains to five followed redirects", async () => {
     const fetchPage = vi
       .fn<typeof fetch>()

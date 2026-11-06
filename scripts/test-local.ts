@@ -28,6 +28,11 @@ const main = async (): Promise<void> => {
       "Input: 1 Movember URL, 2 HTML file, 3 manual amounts [2]: "
     );
 
+    if (!["", "1", "2", "3"].includes(mode)) {
+      throw new Error("Choose mode 1, 2, or 3");
+    }
+
+    let defaultCountry = "au";
     let raised: string;
     let target: string;
 
@@ -41,6 +46,7 @@ const main = async (): Promise<void> => {
         const url = await input.question("HTTPS Movember URL: ");
         const page = await fetchMovemberPage(url);
         ({ html } = page);
+        [defaultCountry] = new URL(page.finalUrl).hostname.split(".");
       } else {
         const filename = await input.question(
           "HTML file [movember-html.html]: "
@@ -49,19 +55,23 @@ const main = async (): Promise<void> => {
         html = await readFile(filename || "movember-html.html", "utf-8");
       }
 
-      const amounts = extractAmounts(html, "local", "au");
+      const amounts = extractAmounts(html, "local", defaultCountry);
       ({ raised } = amounts);
       ({ target } = amounts);
     }
 
-    const country = (await input.question("Country subdomain [au]: ")) || "au";
+    const country =
+      (await input.question(`Country subdomain [${defaultCountry}]: `)) ||
+      defaultCountry;
+
     const amount = parseAmount(raised, country);
+    const goal = parseAmount(target, country);
     console.log(
       JSON.stringify(
         {
           amount,
-          target: parseAmount(target, country),
-          percentage: calculatePercentage(raised, target),
+          target: goal,
+          percentage: calculatePercentage(amount.value, goal.value),
         },
         null,
         2

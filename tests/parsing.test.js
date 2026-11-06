@@ -1,3 +1,4 @@
+/* oxlint-disable vitest/prefer-to-be-truthy, vitest/prefer-to-be-falsy -- The public validator must return exact booleans. */
 import { describe, expect, it } from "vitest";
 
 import {
@@ -25,48 +26,54 @@ describe("parsing.js", () => {
 
   describe(isValidNumber, () => {
     it("should validate numbers with commas", () => {
-      expect(isValidNumber("1,234.56")).toBeTruthy();
-      expect(isValidNumber("10,000")).toBeTruthy();
+      expect(isValidNumber("1,234.56")).toBe(true);
+      expect(isValidNumber("10,000")).toBe(true);
     });
 
     it("should validate numbers without commas", () => {
-      expect(isValidNumber("1234")).toBeTruthy();
-      expect(isValidNumber("500")).toBeTruthy();
+      expect(isValidNumber("1234")).toBe(true);
+      expect(isValidNumber("500")).toBe(true);
     });
 
     it("should validate numbers with currency symbols", () => {
-      expect(isValidNumber("$1,234.56")).toBeTruthy();
-      expect(isValidNumber("£500")).toBeTruthy();
-      expect(isValidNumber("€1,000")).toBeTruthy();
+      expect(isValidNumber("$1,234.56")).toBe(true);
+      expect(isValidNumber("£500")).toBe(true);
+      expect(isValidNumber("€1,000")).toBe(true);
     });
 
     it("should reject non-numeric strings", () => {
-      expect(isValidNumber("abc")).toBeFalsy();
-      expect(isValidNumber("hello")).toBeFalsy();
+      expect(isValidNumber("abc")).toBe(false);
+      expect(isValidNumber("hello")).toBe(false);
     });
 
     it("should reject empty strings", () => {
-      expect(isValidNumber("")).toBeFalsy();
+      expect(isValidNumber("")).toBe(false);
     });
 
     it("should reject null or undefined", () => {
-      expect(isValidNumber(null)).toBeFalsy();
-      expect(isValidNumber(undefined)).toBeFalsy();
+      expect(isValidNumber(null)).toBe(false);
+      expect(isValidNumber(undefined)).toBe(false);
     });
 
     it("should reject strings with only currency symbols", () => {
-      expect(isValidNumber("$")).toBeFalsy();
-      expect(isValidNumber("£")).toBeFalsy();
-      expect(isValidNumber("€")).toBeFalsy();
+      expect(isValidNumber("$")).toBe(false);
+      expect(isValidNumber("£")).toBe(false);
+      expect(isValidNumber("€")).toBe(false);
     });
 
     it("should reject strings with only commas and spaces", () => {
-      expect(isValidNumber(", ,")).toBeFalsy();
-      expect(isValidNumber("$ ,")).toBeFalsy();
+      expect(isValidNumber(", ,")).toBe(false);
+      expect(isValidNumber("$ ,")).toBe(false);
     });
   });
 
   describe(calculatePercentage, () => {
+    it("preserves numeric prefixes and missing-input semantics", () => {
+      expect(calculatePercentage("1,234 AUD", "2,468 AUD")).toBe(50);
+      expect(calculatePercentage("", "100")).toBeNaN();
+      expect(calculatePercentage("100", ",")).toBeNaN();
+    });
+
     it("should calculate percentage correctly", () => {
       expect(calculatePercentage("2,500", "10,000")).toBe(25);
       expect(calculatePercentage("500", "1,000")).toBe(50);

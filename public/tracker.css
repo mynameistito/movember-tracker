@@ -1,5 +1,5 @@
 :root {
-  font-family: Inter, Arial, sans-serif;
+  font-family: Arial, sans-serif;
   color: #192b24;
   background: #f6f5ef;
   line-height: 1.5;
@@ -116,7 +116,7 @@ button {
     transform 0.15s,
     background 0.15s;
 }
-button:hover {
+button:enabled:hover {
   background: #365b43;
   transform: translateY(-1px);
 }

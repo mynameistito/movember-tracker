@@ -148,7 +148,7 @@ const probeCountry = async (
   } catch (error) {
     signal?.throwIfAborted();
 
-    if (error instanceof ProxyRequestError && error.status !== 404) {
+    if (!(error instanceof ProxyRequestError) || error.status !== 404) {
       throw error;
     }
 

@@ -3,7 +3,7 @@ import { Effect } from "effect";
 
 import { getStaleCachedData } from "./cache.js";
 import type { CachedData } from "./cache.js";
-import { Tracking, trackingLayer } from "./tracking.js";
+import { Tracking, TrackingError, trackingLayer } from "./tracking.js";
 import type { TrackingInput } from "./tracking.js";
 
 /**
@@ -37,16 +37,22 @@ export const observeTracking = (
     staleTime: interval,
     refetchInterval: interval,
     refetchIntervalInBackground: true,
-    retry: 2,
+    retry: (failures, error) =>
+      failures < 2 && error instanceof TrackingError && error.retryable,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
   });
 
+  let notified = false;
+
   const unsubscribe = observer.subscribe((result) => {
+    notified = true;
     listener(result.data, result.isError);
   });
 
-  const current = observer.getCurrentResult();
-  listener(current.data, current.isError);
+  if (!notified) {
+    const current = observer.getCurrentResult();
+    listener(current.data, current.isError);
+  }
 
   return () => {
     unsubscribe();

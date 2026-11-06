@@ -19,9 +19,19 @@ const mount = (): void => {
   }
 
   const params = new URLSearchParams(location.search);
-  type.value = params.has("teamId") ? "team" : "member";
+
+  const teamId =
+    [params.get("teamId"), params.get("teamid")].find(
+      (value) => value !== null && value !== ""
+    ) ?? null;
+
+  type.value = teamId === null ? "member" : "team";
   id.value =
-    params.get("teamId") ?? params.get("memberId") ?? DEFAULT_MEMBER_ID;
+    teamId ??
+    [params.get("memberId"), params.get("memberid")].find(
+      (value) => value !== null && value !== ""
+    ) ??
+    DEFAULT_MEMBER_ID;
 
   const resize = new ResizeObserver(() => {
     frame.style.transform = `scale(${(frame.parentElement?.clientWidth ?? 1920) / 1920})`;
@@ -77,15 +87,6 @@ const mount = (): void => {
   copy.addEventListener("click", () => {
     void copyUrl();
   });
-  window.addEventListener(
-    "pagehide",
-    () => {
-      resize.disconnect();
-    },
-    {
-      once: true,
-    }
-  );
 };
 
 mount();

@@ -47,12 +47,14 @@ describe("country discovery", () => {
     expect(getCachedSubdomain("member", "403123")).toBeNull();
   });
 
-  it("does not cache a default country when all probes fail", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn<typeof fetch>().mockRejectedValue(new Error("Offline"))
-    );
-    await expect(detectSubdomainForMember("987654")).resolves.toBe("au");
+  it("stops discovery on network failure without caching a default country", async () => {
+    const network = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new Error("Offline"));
+
+    vi.stubGlobal("fetch", network);
+    await expect(detectSubdomainForMember("987654")).rejects.toThrow("Offline");
+    expect(network).toHaveBeenCalledOnce();
     expect(getCachedSubdomain("member", "987654")).toBeNull();
   });
 

@@ -63,7 +63,7 @@ export const SUBDOMAIN_CURRENCY_MAP: CountryCurrencies = {
 export const getCurrencyFromSubdomain = (
   subdomain: string | null | undefined
 ): string => {
-  if (!(subdomain !== null && subdomain !== undefined && subdomain !== "")) {
+  if (subdomain === null || subdomain === undefined || subdomain === "") {
     return "AUD";
   }
 
@@ -98,11 +98,9 @@ export const getCurrencySymbol = (
   currencyCode: string | null | undefined
 ): string => {
   if (
-    !(
-      currencyCode !== null &&
-      currencyCode !== undefined &&
-      currencyCode !== ""
-    )
+    currencyCode === null ||
+    currencyCode === undefined ||
+    currencyCode === ""
   ) {
     return "$";
   }

@@ -8,5 +8,8 @@ export default defineConfig({
     ...(ultracite.ignorePatterns ?? []),
     "public/js/**",
     "movember-html.html",
+    // Editor-owned workspace state is not application source.
+    ".cursor/**",
+    ".zed/**",
   ],
 });

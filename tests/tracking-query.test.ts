@@ -75,6 +75,10 @@ describe("tracking query", () => {
       await vi.waitFor(
         () => {
           expect(getCachedData("team", "456")?.amount).toBe("$1,250");
+          expect(listener).toHaveBeenLastCalledWith(
+            getCachedData("team", "456"),
+            false
+          );
         },
         { timeout: 3000 }
       );

@@ -73,7 +73,9 @@ const readErrorLog = (): ErrorInfo[] => {
     )(stored);
 
     return [...Option.getOrElse(decoded, () => [])];
-  } catch {
+  } catch (error) {
+    logger.warn(diagnosticTag, "Failed to read persisted error log", error);
+
     return [];
   }
 };
@@ -261,7 +263,11 @@ const sanitizeUrl = (url: string | undefined): string | undefined => {
   try {
     const urlObj = new URL(url);
     const { origin } = urlObj;
-    const { pathname } = urlObj;
+
+    const pathname = urlObj.pathname.replaceAll(
+      /\/team\/(?<id>[^/]+)/gu,
+      (_match, id: string) => `/team/${hashValue(id)}`
+    );
 
     // If no safe query params whitelist, return only origin + pathname
     if (SAFE_QUERY_PARAMS.size === 0) {

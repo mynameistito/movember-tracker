@@ -30,4 +30,15 @@ describe("persisted error log", () => {
     expect(encoded).not.toContain("token=private");
     expect(encoded).not.toContain('"memberId":"123456"');
   });
+
+  it("hashes team identifiers in persisted diagnostic URLs", () => {
+    trackNetworkError(new Error("Request failed"), {
+      memberId: "987654321",
+      url: "https://nz.movember.com/team/987654321?token=private",
+    });
+    const encoded = JSON.stringify(getRecentErrors());
+    expect(encoded).not.toContain("987654321");
+    expect(encoded).not.toContain("token=private");
+    expect(getRecentErrors()[0].context.url).toContain("/team/hash_");
+  });
 });

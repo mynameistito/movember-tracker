@@ -1,40 +1,11 @@
-# Local Testing Script
+# Local parser tool
 
-This script allows you to test the HTML parsing logic locally without needing to run the full scraper.
+Run `bun run test:local` and choose one input mode:
 
-## Usage
+1. Fetch an HTTPS Movember page. Redirects use the same validated, bounded fetch operation as the Worker.
+2. Read an HTML file. An empty path selects `movember-html.html`.
+3. Enter raised and target amounts manually.
 
-Run the test script:
+Then enter the country subdomain, such as `nz`, `au`, or `uk`. The tool prints parsed amounts, currency, and percentage as JSON. It uses Happy DOM for the same DOM parsing path used in the browser. An HTML file can be saved from a member or team page to investigate markup changes without making repeated live requests.
 
-```bash
-bun run test:local
-```
-
-or
-
-```bash
-npm run test:local
-```
-
-## Options
-
-1. **Load HTML from file** - Test parsing with an HTML file (e.g., `movember-html.html`)
-2. **Manually enter amounts** - Skip HTML parsing and just provide raised/target amounts directly
-
-## Example Workflow
-
-1. Save HTML from a Movember page to `movember-html.html` in the project root
-2. Run `bun run test:local`
-3. Choose option 1 and press Enter (to use default file)
-4. Review the extracted amounts
-5. If amounts aren't found, use the debug options to inspect the HTML
-
-## Debugging
-
-If the parser doesn't find amounts, you can:
-
-- View the first 1000 characters of HTML
-- Search for specific text in the HTML
-- See all dollar amounts found in the HTML
-
-This helps identify what patterns might be needed for extraction.
+`bun run typecheck` checks this script as well as the browser and Worker code. Automated regression tests run with `bun run test --run`.

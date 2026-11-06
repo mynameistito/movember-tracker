@@ -14,7 +14,7 @@ import {
 } from "../src/client/regex-patterns.ts";
 
 describe("regex-patterns.js", () => {
-  describe(URL_PATTERNS, () => {
+  describe("url patterns", () => {
     it("should extract subdomain from Movember URL", () => {
       const url = "https://uk.movember.com/donate/details?memberId=12345";
       const match = url.match(URL_PATTERNS.SUBDOMAIN);
@@ -43,7 +43,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(CURRENCY_CODE_PATTERNS, () => {
+  describe("currency code patterns", () => {
     it("should match GBP currency codes", () => {
       const html = "GBP 1,234.56";
       expect(CURRENCY_CODE_PATTERNS[0].test(html)).toBeTruthy();
@@ -65,7 +65,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(COUNTRY_DETECTION_PATTERNS, () => {
+  describe("country detection patterns", () => {
     it("should match Ireland patterns", () => {
       const html = "Ireland is a country";
       expect(COUNTRY_DETECTION_PATTERNS.IRELAND.test(html)).toBeTruthy();
@@ -82,7 +82,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(DOLLAR_AMOUNT_PATTERN, () => {
+  describe("dollar amount pattern", () => {
     it("should match dollar amounts", () => {
       expect(DOLLAR_AMOUNT_PATTERN.test("$1,234.56")).toBeTruthy();
       expect(DOLLAR_AMOUNT_PATTERN.test("$500")).toBeTruthy();
@@ -95,7 +95,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(RAISED_PATTERNS, () => {
+  describe("raised patterns", () => {
     it("should match raised amount patterns", () => {
       const html = '"AmountRaised":{"originalAmount":"1,234.56"}';
       const matched = RAISED_PATTERNS.some((pattern) => pattern.test(html));
@@ -111,7 +111,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(TARGET_PATTERNS, () => {
+  describe("target patterns", () => {
     it("should match target amount patterns", () => {
       const html = '"target":{"fundraising":{"value":"10,000"}}';
       const matched = TARGET_PATTERNS.some((pattern) => pattern.test(html));
@@ -127,7 +127,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(RAISED_JSON_PATTERNS, () => {
+  describe("raised json patterns", () => {
     it("should match raised amount in JSON", () => {
       const html = '{"raised":"1,234.56"}';
 
@@ -149,7 +149,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(TARGET_JSON_PATTERNS, () => {
+  describe("target json patterns", () => {
     it("should match target amount in JSON", () => {
       const html = '{"target":"10,000"}';
 
@@ -171,7 +171,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(GENERIC_RAISED_PATTERNS, () => {
+  describe("generic raised patterns", () => {
     it("should match generic raised patterns", () => {
       const html = "$1,234.56 raised";
 
@@ -193,7 +193,7 @@ describe("regex-patterns.js", () => {
     });
   });
 
-  describe(GENERIC_TARGET_PATTERNS, () => {
+  describe("generic target patterns", () => {
     it("should match generic target patterns", () => {
       const html = "$10,000 target";
 

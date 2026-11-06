@@ -5,12 +5,37 @@ import {
   setCachedData,
   setCachedSubdomain,
 } from "../src/client/cache";
-import { getData, getTeamData } from "../src/client/scraper/orchestrator";
+import { getRecentErrors } from "../src/client/error-tracking";
+import {
+  getData,
+  getTeamData,
+  scrapeTeamPage,
+} from "../src/client/scraper/orchestrator";
 
 describe("cached donation reads", () => {
   afterEach(() => {
     localStorage.clear();
     vi.unstubAllGlobals();
+  });
+
+  it("omits raw team IDs from persisted markup failures", async () => {
+    const id = "987654321";
+    setCachedSubdomain("team", id, "nz", 86_400_000);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response("<html><body>No totals</body></html>", {
+          headers: { "X-Final-URL": `https://nz.movember.com/team/${id}` },
+        })
+      )
+    );
+    await expect(scrapeTeamPage(id)).rejects.toThrow(
+      "Could not find raised amount"
+    );
+    const errors = getRecentErrors();
+    expect(errors).toHaveLength(1);
+    expect(errors[0].category).toBe("scraping");
+    expect(JSON.stringify(errors)).not.toContain(id);
   });
 
   it.each(["member", "team"] as const)(

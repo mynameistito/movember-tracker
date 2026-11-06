@@ -110,7 +110,7 @@ const scrapeFundraiser = async (
 
     if (!isValidNumber(raised)) {
       throw new Error(
-        `Could not find raised amount in HTML for ${type} ${id}. Movember markup may have changed.`
+        `Could not find raised amount in HTML for ${type}. Movember markup may have changed.`
       );
     }
 

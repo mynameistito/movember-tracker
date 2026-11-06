@@ -32,9 +32,9 @@ npm run test:local
 ## Debugging
 
 If the parser doesn't find amounts, you can:
+
 - View the first 1000 characters of HTML
 - Search for specific text in the HTML
 - See all dollar amounts found in the HTML
 
 This helps identify what patterns might be needed for extraction.
-

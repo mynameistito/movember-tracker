@@ -1,8 +1,10 @@
+/* oxlint-disable unicorn/prefer-string-replace-all -- Browser bundles target ES2020, which lacks replaceAll. */
 import { getCurrencyFromSubdomain } from "./constants.js";
 
+/** Numeric text and the currency selected by the fundraiser's country. */
 export interface ParsedAmount {
-	value: string;
-	currency: string;
+  value: string;
+  currency: string;
 }
 
 /**
@@ -12,29 +14,33 @@ export interface ParsedAmount {
  * @param subdomain - Required subdomain (e.g., "uk", "au", "us") to determine currency
  * @returns Object containing the extracted amount value and currency code
  * @example
- * parseAmount("$1,234.56", "us") // { value: "1,234.56", currency: "USD" }
- * parseAmount("£500", "uk") // { value: "500", currency: "GBP" }
+ * parseAmount("$1,234.56", "us") // USD 1,234.56
+ * parseAmount("£500", "uk") // GBP 500
  */
 export const parseAmount = (
-	text: string,
-	subdomain: string | null | undefined,
+  text: string,
+  subdomain: string | null | undefined
 ): ParsedAmount => {
-	// Remove whitespace and extract amount
-	const cleaned = text.trim();
+  // Remove whitespace and extract amount
+  const cleaned = text.trim();
 
-	// Always use subdomain to determine currency - this is the source of truth
-	// If subdomain is not provided, default to AUD
-	const currency = subdomain ? getCurrencyFromSubdomain(subdomain) : "AUD";
+  // Always use subdomain to determine currency - this is the source of truth
+  // If subdomain is not provided, default to AUD
+  const currency =
+    subdomain !== null && subdomain !== undefined && subdomain !== ""
+      ? getCurrencyFromSubdomain(subdomain)
+      : "AUD";
 
-	// Extract amount (supports numbers with commas and optional decimals)
-	// Remove currency symbols and codes before extracting number
-	const cleanedForAmount = cleaned
-		.replace(/[$€£¥]|\b(USD|EUR|GBP|AUD|JPY|CAD|NZD|ZAR)\b/gi, "")
-		.trim();
-	const amountMatch = cleanedForAmount.match(/[\d,]+\.?\d*/);
-	const amount = amountMatch ? amountMatch[0] : "0";
+  // Extract amount (supports numbers with commas and optional decimals)
+  // Remove currency symbols and codes before extracting number
+  const cleanedForAmount = cleaned
+    .replace(/[$€£¥]|\b(?:USD|EUR|GBP|AUD|JPY|CAD|NZD|ZAR)\b/giu, "")
+    .trim();
 
-	return { value: amount, currency };
+  const amountMatch = /[\d,]+\.?\d*/u.exec(cleanedForAmount);
+  const amount = amountMatch ? amountMatch[0] : "0";
+
+  return { value: amount, currency };
 };
 
 /**
@@ -49,24 +55,29 @@ export const parseAmount = (
  * isValidNumber("$") // false
  */
 export const isValidNumber = (value: string | null | undefined): boolean => {
-	if (!value || typeof value !== "string") {
-		return false;
-	}
-	// Remove commas, spaces, and currency symbols, then check if we have at least one digit
-	const cleaned = value.replace(/[,.\s$€£¥]/g, "");
-	// Must have at least one digit and be a valid number
-	if (!cleaned || cleaned.length === 0 || !/^\d+$/.test(cleaned)) {
-		return false;
-	}
-	// Additional check: the original value should contain at least one digit
-	if (!/\d/.test(value)) {
-		return false;
-	}
-	// Reject if value is just commas, spaces, or currency symbols
-	if (/^[,.\s$€£¥]+$/.test(value)) {
-		return false;
-	}
-	return true;
+  if (!(value !== null && value !== undefined && value !== "")) {
+    return false;
+  }
+
+  // Remove commas, spaces, and currency symbols, then check if we have at least one digit
+  const cleaned = value.replace(/[,.\s$€£¥]/gu, "");
+
+  // Must have at least one digit and be a valid number
+  if (!cleaned || cleaned.length === 0 || !/^\d+$/u.test(cleaned)) {
+    return false;
+  }
+
+  // Additional check: the original value should contain at least one digit
+  if (!/\d/u.test(value)) {
+    return false;
+  }
+
+  // Reject if value is just commas, spaces, or currency symbols
+  if (/^[,.\s$€£¥]+$/u.test(value)) {
+    return false;
+  }
+
+  return true;
 };
 
 /**
@@ -79,8 +90,13 @@ export const isValidNumber = (value: string | null | undefined): boolean => {
  * calculatePercentage("500", "1,000") // 50
  */
 export const calculatePercentage = (raised: string, target: string): number => {
-	const raisedNum = parseFloat(raised.replace(/,/g, ""));
-	const targetNum = parseFloat(target.replace(/,/g, ""));
-	if (targetNum === 0) return 0;
-	return Math.round((raisedNum / targetNum) * 100);
+  /* oxlint-disable unicorn/prefer-number-coercion -- Preserve numeric-prefix parsing and NaN for empty input. */
+  const raisedNum = Number.parseFloat(raised.replace(/,/gu, ""));
+  const targetNum = Number.parseFloat(target.replace(/,/gu, ""));
+
+  if (targetNum === 0) {
+    return 0;
+  }
+
+  return Math.round((raisedNum / targetNum) * 100);
 };

@@ -1,345 +1,302 @@
+import { Effect, Schedule, Schema } from "effect";
 /**
  * Main orchestration logic for scraping Movember pages
- * @module scraper/orchestrator
  */
 
 import {
-	type CachedData,
-	clearSubdomainCache,
-	getCachedData,
-	getStaleCachedData,
-	isCachedDataStale,
-	setCachedData,
-	setCachedSubdomain,
+  clearSubdomainCache,
+  getCachedData,
+  getStaleCachedData,
+  isCachedDataStale,
+  setCachedData,
+  setCachedSubdomain,
 } from "../cache.js";
+import type { CachedData } from "../cache.js";
 import {
-	CACHE_TTL,
-	getCurrencySymbol,
-	MAX_RETRIES,
-	RETRY_DELAYS,
-	SUBDOMAIN_CACHE_TTL,
+  CACHE_TTL,
+  getCurrencySymbol,
+  MAX_RETRIES,
+  SUBDOMAIN_CACHE_TTL,
 } from "../constants.js";
 import { trackScrapingError } from "../error-tracking.js";
-import { formatDuration, sleep } from "../formatting.js";
-import logger from "../logger.js";
+import { logger } from "../logger.js";
 import { calculatePercentage, isValidNumber, parseAmount } from "../parsing.js";
 import { extractAmounts } from "./html-parsing.js";
 import {
-	buildMovemberUrl,
-	buildTeamUrl,
-	extractSubdomainFromUrl,
-	fetchViaProxy,
+  buildMovemberUrl,
+  buildTeamUrl,
+  extractSubdomainFromUrl,
+  fetchViaProxy,
 } from "./network.js";
 import {
-	detectSubdomainForMember,
-	detectSubdomainForTeam,
-	detectSubdomainFromHtml,
-	getSubdomainForMember,
-	getSubdomainForTeam,
+  detectSubdomainForMember,
+  detectSubdomainForTeam,
+  getSubdomainForMember,
+  getSubdomainForTeam,
 } from "./subdomain.js";
 
+const fundraiserUrl = (
+  type: "member" | "team",
+  id: string,
+  country: string
+): string =>
+  type === "team" ? buildTeamUrl(id, country) : buildMovemberUrl(id, country);
+
+const loadFundraiser = async (
+  type: "member" | "team",
+  id: string,
+  country: string,
+  clearOn404: boolean,
+  signal?: AbortSignal
+) => {
+  try {
+    return await fetchViaProxy(fundraiserUrl(type, id, country), signal);
+  } catch (error) {
+    if (
+      !clearOn404 ||
+      !(error instanceof Error) ||
+      !error.message.includes("404")
+    ) {
+      throw error;
+    }
+
+    clearSubdomainCache(type, id);
+
+    const detected =
+      type === "team"
+        ? await detectSubdomainForTeam(id, true, signal)
+        : await detectSubdomainForMember(id, true, signal);
+
+    if (detected === country) {
+      throw error;
+    }
+
+    return await fetchViaProxy(fundraiserUrl(type, id, detected), signal);
+  }
+};
+
+const scrapeFundraiser = async (
+  type: "member" | "team",
+  id: string,
+  clearOn404: boolean,
+  signal?: AbortSignal
+): Promise<ScrapedData> => {
+  const started = Date.now();
+  let subdomain: string | undefined;
+  let url: string | undefined;
+
+  try {
+    const country =
+      type === "team"
+        ? await getSubdomainForTeam(id, signal)
+        : await getSubdomainForMember(id, signal);
+
+    subdomain = country;
+    url = fundraiserUrl(type, id, country);
+
+    const { html, finalUrl } = await loadFundraiser(
+      type,
+      id,
+      country,
+      clearOn404,
+      signal
+    );
+
+    subdomain = extractSubdomainFromUrl(finalUrl) ?? country;
+    url = finalUrl;
+    setCachedSubdomain(type, id, subdomain, SUBDOMAIN_CACHE_TTL);
+
+    const { raised, target } = extractAmounts(html, id, subdomain);
+
+    if (!isValidNumber(raised)) {
+      throw new Error(
+        `Could not find raised amount in HTML for ${type}. Movember markup may have changed.`
+      );
+    }
+
+    const { value, currency } = parseAmount(raised, subdomain);
+    const symbol = getCurrencySymbol(currency);
+
+    const data: ScrapedData = {
+      amount: `${symbol}${value}`,
+      currency,
+      subdomain,
+      timestamp: Date.now(),
+    };
+
+    if (isValidNumber(target)) {
+      const goal = parseAmount(target, subdomain).value;
+      data.target = `${symbol}${goal}`;
+      data.percentage = calculatePercentage(value, goal);
+    }
+
+    return data;
+  } catch (caughtError) {
+    signal?.throwIfAborted();
+
+    const error =
+      caughtError instanceof Error
+        ? caughtError
+        : new Error(String(caughtError));
+
+    trackScrapingError(error, {
+      memberId: id,
+      subdomain,
+      url,
+      metadata: { duration: Date.now() - started, type },
+    });
+
+    throw error;
+  }
+};
+
+const retryScrape = async (
+  type: "member" | "team",
+  id: string,
+  scrape: (id: string, clearOn404: boolean) => Promise<ScrapedData>
+): Promise<ScrapedData> =>
+  await Effect.runPromise(
+    Effect.tryPromise({
+      try: async () => await scrape(id, true),
+      catch: (caughtError) => {
+        const error =
+          caughtError instanceof Error
+            ? caughtError
+            : new Error(String(caughtError));
+
+        if (error.message.includes("404")) {
+          clearSubdomainCache(type, id);
+        }
+
+        return error;
+      },
+    }).pipe(
+      Effect.retry({
+        times: MAX_RETRIES - 1,
+        schedule: Schedule.exponential(1000),
+      })
+    )
+  );
+
+/** A donation snapshot returned by the scraper. */
 export interface ScrapedData extends CachedData {
-	amount: string;
-	currency: string;
-	subdomain: string;
-	timestamp: number;
-	target?: string;
-	percentage?: number;
+  amount: string;
+  currency: string;
+  subdomain: string;
+  timestamp: number;
+  target?: string;
+  percentage?: number;
 }
 
+const CacheStatus = Schema.Literals(["HIT", "MISS", "STALE", "LIVE"]);
+
+/** A donation snapshot and the cache state used to obtain it. */
 export interface GetDataResult {
-	data: ScrapedData;
-	cacheStatus: "HIT" | "MISS" | "STALE" | "LIVE";
+  data: ScrapedData;
+  cacheStatus: Schema.Schema.Type<typeof CacheStatus>;
 }
 
 /**
  * Scrape the Movember page using Worker's CORS proxy and HTML parsing
- * @param memberId - The member ID to scrape
+ * @param id - The member ID to scrape
  * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
+ * @param signal - Cancels discovery and fetching.
  * @returns The scraped data
- * @throws If scraping fails
+ * @throws {Error} If scraping fails
  */
-export async function scrapeMovemberPage(
-	memberId: string,
-	clearSubdomainOn404 = false,
-): Promise<ScrapedData> {
-	let subdomain = await getSubdomainForMember(memberId);
-	const movemberUrl = buildMovemberUrl(memberId, subdomain);
-	const startTime = Date.now();
-	logger.info(
-		"[SCRAPE]",
-		`Starting scrape of Movember page: ${movemberUrl} (subdomain: ${subdomain})`,
-	);
-
-	try {
-		// Fetch the HTML via Worker's CORS proxy
-		logger.info("[SCRAPE]", `Fetching HTML from ${movemberUrl} via proxy...`);
-		const fetchStart = Date.now();
-		let html: string;
-		let finalUrl: string;
-
-		try {
-			const result = await fetchViaProxy(movemberUrl);
-			html = result.html;
-			finalUrl = result.finalUrl;
-		} catch (error) {
-			// If we get an error, try clearing subdomain cache and re-detecting
-			if (
-				clearSubdomainOn404 &&
-				error instanceof Error &&
-				error.message.includes("404")
-			) {
-				logger.warn(
-					"[SCRAPE]",
-					`Got 404 for ${movemberUrl}, clearing cached subdomain and re-detecting...`,
-				);
-				clearSubdomainCache("member", memberId);
-				// Re-detect subdomain with force refresh
-				const newSubdomain = await detectSubdomainForMember(memberId, true);
-				if (newSubdomain !== subdomain) {
-					logger.info(
-						"[SCRAPE]",
-						`Re-detected subdomain: ${newSubdomain} (was ${subdomain}), retrying with new subdomain...`,
-					);
-					// Retry with new subdomain
-					const newUrl = buildMovemberUrl(memberId, newSubdomain);
-					const retryResult = await fetchViaProxy(newUrl);
-					html = retryResult.html;
-					finalUrl = retryResult.finalUrl;
-					subdomain = newSubdomain;
-				} else {
-					throw new Error(
-						`HTTP error! status: 404 (page not found - member may not exist)`,
-					);
-				}
-			} else {
-				throw error;
-			}
-		}
-
-		const fetchDuration = Date.now() - fetchStart;
-		logger.info(
-			"[SCRAPE]",
-			`HTML fetched successfully in ${formatDuration(fetchDuration)} (${html.length} characters)`,
-		);
-
-		// Check if URL redirected to a different subdomain
-		const actualSubdomain = extractSubdomainFromUrl(finalUrl);
-		if (actualSubdomain && actualSubdomain !== subdomain) {
-			logger.info(
-				"[SCRAPE]",
-				`URL redirected from ${subdomain} to ${actualSubdomain}, updating subdomain...`,
-			);
-			subdomain = actualSubdomain;
-			// Update cache with correct subdomain
-			setCachedSubdomain("member", memberId, subdomain, SUBDOMAIN_CACHE_TTL);
-		}
-
-		// Verify subdomain by checking HTML content for currency indicators (optional verification only)
-		const htmlDetectedSubdomain = detectSubdomainFromHtml(html);
-		if (htmlDetectedSubdomain && htmlDetectedSubdomain !== subdomain) {
-			logger.warn(
-				"[SCRAPE]",
-				`HTML currency indicates subdomain ${htmlDetectedSubdomain} but URL subdomain is ${subdomain}. Trusting URL subdomain (primary source).`,
-			);
-			// Don't override - trust the URL subdomain we're using
-		} else if (htmlDetectedSubdomain === subdomain) {
-			logger.info(
-				"[SCRAPE]",
-				`HTML currency verification confirms subdomain ${subdomain}`,
-			);
-		}
-
-		// Extract data from HTML
-		const { raised, target } = extractAmounts(html, memberId, subdomain);
-
-		// Final validation check - ensure raised is actually valid before using
-		if (!raised || !isValidNumber(raised)) {
-			// Debug: Try to find any dollar amounts in the HTML to help diagnose
-			const allDollarAmounts = html.match(/\$[\d,]+(?:\.\d+)?/g);
-			logger.warn(
-				"[SCRAPE]",
-				`Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML:`,
-				allDollarAmounts ? allDollarAmounts.slice(0, 10) : [],
-			); // Show first 10
-
-			// Try to find any numbers that might be amounts
-			const potentialAmounts = html.match(/[\d,]{3,}(?:\.\d+)?/g);
-			logger.warn(
-				"[SCRAPE]",
-				`Found ${potentialAmounts ? potentialAmounts.length : 0} potential amount numbers in HTML (showing first 20):`,
-				potentialAmounts ? potentialAmounts.slice(0, 20) : [],
-			);
-
-			const errorDetails = {
-				memberId,
-				subdomain,
-				url: movemberUrl,
-				message:
-					"Could not find raised amount in HTML. The page may require JavaScript execution or the HTML structure may have changed.",
-				htmlLength: html.length,
-				dollarAmountsFound: allDollarAmounts ? allDollarAmounts.length : 0,
-				raisedValue: raised || "empty",
-			};
-			logger.error(
-				"[SCRAPE]",
-				"Failed to extract raised amount:",
-				errorDetails,
-			);
-			throw new Error(
-				`Could not find raised amount in HTML for memberId ${memberId} (subdomain: ${subdomain}). The page may require JavaScript execution or the HTML structure may have changed. Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML.`,
-			);
-		}
-
-		// Double-check that raised is valid before parsing
-		if (!isValidNumber(raised)) {
-			throw new Error(
-				`Invalid raised value captured: "${raised}" for memberId ${memberId}`,
-			);
-		}
-
-		// Parse amount with subdomain to determine correct currency
-		const { value: raisedValue, currency } = parseAmount(
-			`$${raised}`,
-			subdomain,
-		);
-
-		// Validate the parsed value is not empty or zero (unless it's actually zero)
-		if (!raisedValue || raisedValue === "0" || raisedValue === "") {
-			logger.warn(
-				"[SCRAPE]",
-				`Parsed raised value is invalid: "${raisedValue}" from input: "${raised}"`,
-			);
-		}
-
-		// Format amount with appropriate currency symbol
-		const currencySymbol = getCurrencySymbol(currency);
-		const raisedFormatted = `${currencySymbol}${raisedValue}`;
-
-		const result: ScrapedData = {
-			amount: raisedFormatted,
-			currency,
-			subdomain, // Include subdomain in result for consolidated cache
-			timestamp: Date.now(),
-		};
-
-		if (target && isValidNumber(target)) {
-			const { value: targetValue } = parseAmount(`$${target}`, subdomain);
-			// Use the same currency symbol for consistency
-			const targetFormatted = `${currencySymbol}${targetValue}`;
-			result.target = targetFormatted;
-			result.percentage = calculatePercentage(raisedValue, targetValue);
-		} else if (target) {
-			logger.warn(
-				"[SCRAPE]",
-				`Target value "${target}" failed validation, skipping target`,
-			);
-		}
-
-		const totalDuration = Date.now() - startTime;
-		logger.info(
-			"[SCRAPE]",
-			`Scraping completed successfully in ${formatDuration(totalDuration)}:`,
-			{
-				amount: result.amount,
-				target: result.target,
-				percentage: result.percentage,
-				currency: result.currency,
-				subdomain: result.subdomain,
-			},
-		);
-
-		return result;
-	} catch (error) {
-		const totalDuration = Date.now() - startTime;
-		const errorMessage = error instanceof Error ? error.message : String(error);
-
-		// Track error with structured context
-		trackScrapingError(
-			error instanceof Error ? error : new Error(errorMessage),
-			{
-				memberId,
-				subdomain,
-				url: movemberUrl,
-				metadata: {
-					duration: totalDuration,
-					timestamp: Date.now(),
-				},
-			},
-		);
-
-		logger.error(
-			"[SCRAPE]",
-			`Scraping failed after ${formatDuration(totalDuration)}:`,
-			errorMessage,
-			error,
-		);
-		throw error;
-	}
-}
+export const scrapeMovemberPage = async (
+  id: string,
+  clearSubdomainOn404 = false,
+  signal?: AbortSignal
+): Promise<ScrapedData> =>
+  await scrapeFundraiser("member", id, clearSubdomainOn404, signal);
 
 /**
  * Retry wrapper with exponential backoff
- * @param memberId - The member ID to scrape
+ * @param id - The member ID to scrape
  * @returns The scraped data
- * @throws If all retries fail
+ * @throws {Error} If all retries fail
  */
-export async function scrapeWithRetry(memberId: string): Promise<ScrapedData> {
-	let lastError: Error | null = null;
-	const retryStartTime = Date.now();
+export const scrapeWithRetry = async (id: string): Promise<ScrapedData> =>
+  await retryScrape("member", id, scrapeMovemberPage);
 
-	logger.info(
-		"[RETRY]",
-		`Starting retry logic (max ${MAX_RETRIES} attempts) for memberId: ${memberId}`,
-	);
+/**
+ * Scrape the Movember team page using Worker's CORS proxy and HTML parsing
+ * @param id - The team ID to scrape
+ * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
+ * @param signal - Cancels discovery and fetching.
+ * @returns The scraped data
+ * @throws {Error} If scraping fails
+ */
+export const scrapeTeamPage = async (
+  id: string,
+  clearSubdomainOn404 = false,
+  signal?: AbortSignal
+): Promise<ScrapedData> =>
+  await scrapeFundraiser("team", id, clearSubdomainOn404, signal);
 
-	for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-		try {
-			logger.info("[RETRY]", `Attempt ${attempt + 1}/${MAX_RETRIES}`);
-			// Enable subdomain clearing on 404 for retries (especially on first attempt)
-			const clearSubdomainOn404 =
-				attempt === 0 || lastError?.message.includes("404");
-			const result = await scrapeMovemberPage(memberId, clearSubdomainOn404);
-			const totalDuration = Date.now() - retryStartTime;
-			logger.info(
-				"[RETRY]",
-				`Success on attempt ${attempt + 1} after ${totalDuration}ms`,
-			);
-			return result;
-		} catch (error) {
-			lastError = error instanceof Error ? error : new Error(String(error));
-			const errorMessage = lastError.message;
-			logger.error("[RETRY]", `Attempt ${attempt + 1} failed:`, errorMessage);
+/**
+ * Retry wrapper with exponential backoff for teams
+ * @param id - The team ID to scrape
+ * @returns The scraped data
+ * @throws {Error} If all retries fail
+ */
+export const scrapeTeamWithRetry = async (id: string): Promise<ScrapedData> =>
+  await retryScrape("team", id, scrapeTeamPage);
 
-			// If we got a 404, clear the subdomain cache before retrying
-			if (errorMessage.includes("404")) {
-				logger.info(
-					"[RETRY]",
-					`404 detected, clearing subdomain cache for memberId: ${memberId}`,
-				);
-				clearSubdomainCache("member", memberId);
-			}
+const refreshSnapshot = async (
+  type: "member" | "team",
+  id: string
+): Promise<ScrapedData> => {
+  const data =
+    type === "team" ? await scrapeTeamWithRetry(id) : await scrapeWithRetry(id);
 
-			if (attempt < MAX_RETRIES - 1) {
-				const delay =
-					RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-				logger.info(
-					"[RETRY]",
-					`Waiting ${delay}ms before retry ${attempt + 2}...`,
-				);
-				await sleep(delay);
-			} else {
-				const totalDuration = Date.now() - retryStartTime;
-				logger.error(
-					"[RETRY]",
-					`All ${MAX_RETRIES} attempts failed after ${totalDuration}ms`,
-				);
-			}
-		}
-	}
+  setCachedData(type, id, data, CACHE_TTL);
 
-	throw lastError || new Error("Failed to scrape after all retries");
-}
+  return data;
+};
+
+const refreshInBackground = async (
+  type: "member" | "team",
+  id: string
+): Promise<void> => {
+  try {
+    await refreshSnapshot(type, id);
+  } catch (error) {
+    logger.warn(
+      "[CACHE]",
+      `Refresh failed for ${type} ${id}; retaining the last snapshot`,
+      error
+    );
+  }
+};
+
+const readSnapshot = async (
+  type: "member" | "team",
+  id: string,
+  live: boolean
+): Promise<GetDataResult> => {
+  if (!live) {
+    const cached = getCachedData(type, id);
+
+    if (cached) {
+      return { data: cached, cacheStatus: "HIT" };
+    }
+
+    const stale = getStaleCachedData(type, id);
+
+    if (stale && isCachedDataStale(type, id)) {
+      void refreshInBackground(type, id);
+
+      return { data: stale, cacheStatus: "STALE" };
+    }
+  }
+
+  return {
+    data: await refreshSnapshot(type, id),
+    cacheStatus: live ? "LIVE" : "MISS",
+  };
+};
 
 /**
  * Main function to get data (with stale-while-revalidate caching)
@@ -349,397 +306,10 @@ export async function scrapeWithRetry(memberId: string): Promise<ScrapedData> {
  * @param grabLive - Whether to force a fresh scrape (bypass cache)
  * @returns The data and cache status
  */
-export async function getData(
-	memberId: string,
-	grabLive = false,
-): Promise<GetDataResult> {
-	let data: ScrapedData | null = null;
-	let cacheStatus: GetDataResult["cacheStatus"] = "HIT";
-
-	if (grabLive) {
-		// Force fresh scrape, bypass cache
-		logger.info(
-			"[LIVE]",
-			`grab-live parameter detected - forcing fresh scrape for memberId: ${memberId}`,
-		);
-		data = await scrapeWithRetry(memberId);
-		cacheStatus = "LIVE";
-
-		// Store in cache with 5-minute TTL
-		logger.info(
-			"[CACHE]",
-			`Storing live data in cache with TTL: ${CACHE_TTL}ms for memberId: ${memberId}`,
-		);
-		setCachedData("member", memberId, data, CACHE_TTL);
-		logger.info("[CACHE]", "Live data stored successfully");
-	} else {
-		// Check cache first (fresh data)
-		logger.info("[CACHE]", `Checking cache for memberId: ${memberId}`);
-		data = getCachedData("member", memberId);
-
-		if (data) {
-			const cacheAge = Date.now() - data.timestamp;
-			logger.info(
-				"[CACHE]",
-				`Cache HIT - data age: ${Math.round(cacheAge / 1000)}s for memberId: ${memberId}`,
-				{
-					amount: data.amount,
-					target: data.target,
-					timestamp: new Date(data.timestamp).toISOString(),
-				},
-			);
-		} else {
-			// Check for stale data (stale-while-revalidate pattern)
-			const staleData = getStaleCachedData("member", memberId);
-			const isStale = isCachedDataStale("member", memberId);
-
-			if (staleData && isStale) {
-				// Return stale data immediately (stale-while-revalidate)
-				logger.info(
-					"[CACHE]",
-					`Cache STALE - returning stale data immediately, fetching fresh data in background for memberId: ${memberId}`,
-				);
-				data = staleData;
-				cacheStatus = "STALE";
-
-				// Fetch fresh data in background (don't await)
-				// This updates the cache for the next request
-				scrapeWithRetry(memberId)
-					.then((freshData) => {
-						logger.info(
-							"[CACHE]",
-							`Background refresh completed for memberId: ${memberId}, updating cache`,
-						);
-						setCachedData("member", memberId, freshData, CACHE_TTL);
-					})
-					.catch((error) => {
-						logger.error(
-							"[CACHE]",
-							`Background refresh failed for memberId: ${memberId}:`,
-							error,
-						);
-					});
-			} else {
-				// No cache at all, need to scrape
-				logger.info(
-					"[CACHE]",
-					`Cache MISS - need to scrape for memberId: ${memberId}`,
-				);
-				data = await scrapeWithRetry(memberId);
-				cacheStatus = "MISS";
-
-				// Store in cache with 5-minute TTL
-				logger.info(
-					"[CACHE]",
-					`Storing data in cache with TTL: ${CACHE_TTL}ms for memberId: ${memberId}`,
-				);
-				setCachedData("member", memberId, data, CACHE_TTL);
-				logger.info("[CACHE]", "Data stored successfully");
-			}
-		}
-	}
-
-	// Type guard: data should never be null at this point, but TypeScript can't guarantee it
-	// This is a safety check in case of unexpected code paths
-	if (!data) {
-		throw new Error(
-			`Unexpected null data for memberId: ${memberId}. This should never happen.`,
-		);
-	}
-
-	return { data, cacheStatus };
-}
-
-/**
- * Scrape the Movember team page using Worker's CORS proxy and HTML parsing
- * @param teamId - The team ID to scrape
- * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
- * @returns The scraped data
- * @throws If scraping fails
- */
-export async function scrapeTeamPage(
-	teamId: string,
-	clearSubdomainOn404 = false,
-): Promise<ScrapedData> {
-	let subdomain = await getSubdomainForTeam(teamId);
-	const teamUrl = buildTeamUrl(teamId, subdomain);
-	const startTime = Date.now();
-	logger.info(
-		"[SCRAPE]",
-		`Starting scrape of Movember team page: ${teamUrl} (subdomain: ${subdomain})`,
-	);
-
-	try {
-		// Fetch the HTML via Worker's CORS proxy
-		logger.info("[SCRAPE]", `Fetching HTML from ${teamUrl} via proxy...`);
-		const fetchStart = Date.now();
-		let html: string;
-		let finalUrl: string;
-
-		try {
-			const result = await fetchViaProxy(teamUrl);
-			html = result.html;
-			finalUrl = result.finalUrl;
-		} catch (error) {
-			// If we get an error, try clearing subdomain cache and re-detecting
-			if (
-				clearSubdomainOn404 &&
-				error instanceof Error &&
-				error.message.includes("404")
-			) {
-				logger.warn(
-					"[SCRAPE]",
-					`Got 404 for ${teamUrl}, clearing cached subdomain and re-detecting...`,
-				);
-				clearSubdomainCache("team", teamId);
-				// Re-detect subdomain with force refresh
-				const newSubdomain = await detectSubdomainForTeam(teamId, true);
-				if (newSubdomain !== subdomain) {
-					logger.info(
-						"[SCRAPE]",
-						`Re-detected subdomain: ${newSubdomain} (was ${subdomain}), retrying with new subdomain...`,
-					);
-					// Retry with new subdomain
-					const newUrl = buildTeamUrl(teamId, newSubdomain);
-					const retryResult = await fetchViaProxy(newUrl);
-					html = retryResult.html;
-					finalUrl = retryResult.finalUrl;
-					subdomain = newSubdomain;
-				} else {
-					throw new Error(
-						`HTTP error! status: 404 (page not found - team may not exist)`,
-					);
-				}
-			} else {
-				throw error;
-			}
-		}
-
-		const fetchDuration = Date.now() - fetchStart;
-		logger.info(
-			"[SCRAPE]",
-			`HTML fetched successfully in ${formatDuration(fetchDuration)} (${html.length} characters)`,
-		);
-
-		// Check if URL redirected to a different subdomain
-		const actualSubdomain = extractSubdomainFromUrl(finalUrl);
-		if (actualSubdomain && actualSubdomain !== subdomain) {
-			logger.info(
-				"[SCRAPE]",
-				`URL redirected from ${subdomain} to ${actualSubdomain}, updating subdomain...`,
-			);
-			subdomain = actualSubdomain;
-			// Update cache with correct subdomain
-			setCachedSubdomain("team", teamId, subdomain, SUBDOMAIN_CACHE_TTL);
-		}
-
-		// Verify subdomain by checking HTML content for currency indicators (optional verification only)
-		const htmlDetectedSubdomain = detectSubdomainFromHtml(html);
-		if (htmlDetectedSubdomain && htmlDetectedSubdomain !== subdomain) {
-			logger.warn(
-				"[SCRAPE]",
-				`HTML currency indicates subdomain ${htmlDetectedSubdomain} but URL subdomain is ${subdomain}. Trusting URL subdomain (primary source).`,
-			);
-			// Don't override - trust the URL subdomain we're using
-		} else if (htmlDetectedSubdomain === subdomain) {
-			logger.info(
-				"[SCRAPE]",
-				`HTML currency verification confirms subdomain ${subdomain}`,
-			);
-		}
-
-		// Extract data from HTML
-		const { raised, target } = extractAmounts(html, teamId, subdomain);
-
-		// Final validation check - ensure raised is actually valid before using
-		if (!raised || !isValidNumber(raised)) {
-			// Debug: Try to find any dollar amounts in the HTML to help diagnose
-			const allDollarAmounts = html.match(/\$[\d,]+(?:\.\d+)?/g);
-			logger.warn(
-				"[SCRAPE]",
-				`Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML:`,
-				allDollarAmounts ? allDollarAmounts.slice(0, 10) : [],
-			); // Show first 10
-
-			// Try to find any numbers that might be amounts
-			const potentialAmounts = html.match(/[\d,]{3,}(?:\.\d+)?/g);
-			logger.warn(
-				"[SCRAPE]",
-				`Found ${potentialAmounts ? potentialAmounts.length : 0} potential amount numbers in HTML (showing first 20):`,
-				potentialAmounts ? potentialAmounts.slice(0, 20) : [],
-			);
-
-			const errorDetails = {
-				teamId,
-				subdomain,
-				url: teamUrl,
-				message:
-					"Could not find raised amount in HTML. The page may require JavaScript execution or the HTML structure may have changed.",
-				htmlLength: html.length,
-				dollarAmountsFound: allDollarAmounts ? allDollarAmounts.length : 0,
-				raisedValue: raised || "empty",
-			};
-			logger.error(
-				"[SCRAPE]",
-				"Failed to extract raised amount:",
-				errorDetails,
-			);
-			throw new Error(
-				`Could not find raised amount in HTML for teamId ${teamId} (subdomain: ${subdomain}). The page may require JavaScript execution or the HTML structure may have changed. Found ${allDollarAmounts ? allDollarAmounts.length : 0} dollar amounts in HTML.`,
-			);
-		}
-
-		// Double-check that raised is valid before parsing
-		if (!isValidNumber(raised)) {
-			throw new Error(
-				`Invalid raised value captured: "${raised}" for teamId ${teamId}`,
-			);
-		}
-
-		// Parse amount with subdomain to determine correct currency
-		const { value: raisedValue, currency } = parseAmount(
-			`$${raised}`,
-			subdomain,
-		);
-
-		// Validate the parsed value is not empty or zero (unless it's actually zero)
-		if (!raisedValue || raisedValue === "0" || raisedValue === "") {
-			logger.warn(
-				"[SCRAPE]",
-				`Parsed raised value is invalid: "${raisedValue}" from input: "${raised}"`,
-			);
-		}
-
-		// Format amount with appropriate currency symbol
-		const currencySymbol = getCurrencySymbol(currency);
-		const raisedFormatted = `${currencySymbol}${raisedValue}`;
-
-		const result: ScrapedData = {
-			amount: raisedFormatted,
-			currency,
-			subdomain, // Include subdomain in result for consolidated cache
-			timestamp: Date.now(),
-		};
-
-		if (target && isValidNumber(target)) {
-			const { value: targetValue } = parseAmount(`$${target}`, subdomain);
-			// Use the same currency symbol for consistency
-			const targetFormatted = `${currencySymbol}${targetValue}`;
-			result.target = targetFormatted;
-			result.percentage = calculatePercentage(raisedValue, targetValue);
-		} else if (target) {
-			logger.warn(
-				"[SCRAPE]",
-				`Target value "${target}" failed validation, skipping target`,
-			);
-		}
-
-		const totalDuration = Date.now() - startTime;
-		logger.info(
-			"[SCRAPE]",
-			`Scraping completed successfully in ${formatDuration(totalDuration)}:`,
-			{
-				amount: result.amount,
-				target: result.target,
-				percentage: result.percentage,
-				currency: result.currency,
-				subdomain: result.subdomain,
-			},
-		);
-
-		return result;
-	} catch (error) {
-		const totalDuration = Date.now() - startTime;
-		const errorMessage = error instanceof Error ? error.message : String(error);
-
-		// Track error with structured context
-		trackScrapingError(
-			error instanceof Error ? error : new Error(errorMessage),
-			{
-				memberId: teamId,
-				subdomain,
-				url: teamUrl,
-				metadata: {
-					duration: totalDuration,
-					timestamp: Date.now(),
-				},
-			},
-		);
-
-		logger.error(
-			"[SCRAPE]",
-			`Scraping failed after ${formatDuration(totalDuration)}:`,
-			errorMessage,
-			error,
-		);
-		throw error;
-	}
-}
-
-/**
- * Retry wrapper with exponential backoff for teams
- * @param teamId - The team ID to scrape
- * @returns The scraped data
- * @throws If all retries fail
- */
-export async function scrapeTeamWithRetry(
-	teamId: string,
-): Promise<ScrapedData> {
-	let lastError: Error | null = null;
-	const retryStartTime = Date.now();
-
-	logger.info(
-		"[RETRY]",
-		`Starting retry logic (max ${MAX_RETRIES} attempts) for teamId: ${teamId}`,
-	);
-
-	for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-		try {
-			logger.info("[RETRY]", `Attempt ${attempt + 1}/${MAX_RETRIES}`);
-			// Enable subdomain clearing on 404 for retries (especially on first attempt)
-			const clearSubdomainOn404 =
-				attempt === 0 || lastError?.message.includes("404");
-			const result = await scrapeTeamPage(teamId, clearSubdomainOn404);
-			const totalDuration = Date.now() - retryStartTime;
-			logger.info(
-				"[RETRY]",
-				`Success on attempt ${attempt + 1} after ${totalDuration}ms`,
-			);
-			return result;
-		} catch (error) {
-			lastError = error instanceof Error ? error : new Error(String(error));
-			const errorMessage = lastError.message;
-			logger.error("[RETRY]", `Attempt ${attempt + 1} failed:`, errorMessage);
-
-			// If we got a 404, clear the subdomain cache before retrying
-			if (errorMessage.includes("404")) {
-				logger.info(
-					"[RETRY]",
-					`404 detected, clearing subdomain cache for teamId: ${teamId}`,
-				);
-				clearSubdomainCache("team", teamId);
-			}
-
-			if (attempt < MAX_RETRIES - 1) {
-				const delay =
-					RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-				logger.info(
-					"[RETRY]",
-					`Waiting ${delay}ms before retry ${attempt + 2}...`,
-				);
-				await sleep(delay);
-			} else {
-				const totalDuration = Date.now() - retryStartTime;
-				logger.error(
-					"[RETRY]",
-					`All ${MAX_RETRIES} attempts failed after ${totalDuration}ms`,
-				);
-			}
-		}
-	}
-
-	throw lastError || new Error("Failed to scrape after all retries");
-}
+export const getData = async (
+  memberId: string,
+  grabLive = false
+): Promise<GetDataResult> => await readSnapshot("member", memberId, grabLive);
 
 /**
  * Main function to get team data (with stale-while-revalidate caching)
@@ -749,103 +319,7 @@ export async function scrapeTeamWithRetry(
  * @param grabLive - Whether to force a fresh scrape (bypass cache)
  * @returns The data and cache status
  */
-export async function getTeamData(
-	teamId: string,
-	grabLive = false,
-): Promise<GetDataResult> {
-	let data: ScrapedData | null = null;
-	let cacheStatus: GetDataResult["cacheStatus"] = "HIT";
-
-	if (grabLive) {
-		// Force fresh scrape, bypass cache
-		logger.info(
-			"[LIVE]",
-			`grab-live parameter detected - forcing fresh scrape for teamId: ${teamId}`,
-		);
-		data = await scrapeTeamWithRetry(teamId);
-		cacheStatus = "LIVE";
-
-		// Store in cache with 5-minute TTL
-		logger.info(
-			"[CACHE]",
-			`Storing live data in cache with TTL: ${CACHE_TTL}ms for teamId: ${teamId}`,
-		);
-		setCachedData("team", teamId, data, CACHE_TTL);
-		logger.info("[CACHE]", "Live data stored successfully");
-	} else {
-		// Check cache first (fresh data)
-		logger.info("[CACHE]", `Checking cache for teamId: ${teamId}`);
-		data = getCachedData("team", teamId);
-
-		if (data) {
-			const cacheAge = Date.now() - data.timestamp;
-			logger.info(
-				"[CACHE]",
-				`Cache HIT - data age: ${Math.round(cacheAge / 1000)}s for teamId: ${teamId}`,
-				{
-					amount: data.amount,
-					target: data.target,
-					timestamp: new Date(data.timestamp).toISOString(),
-				},
-			);
-		} else {
-			// Check for stale data (stale-while-revalidate pattern)
-			const staleData = getStaleCachedData("team", teamId);
-			const isStale = isCachedDataStale("team", teamId);
-
-			if (staleData && isStale) {
-				// Return stale data immediately (stale-while-revalidate)
-				logger.info(
-					"[CACHE]",
-					`Cache STALE - returning stale data immediately, fetching fresh data in background for teamId: ${teamId}`,
-				);
-				data = staleData;
-				cacheStatus = "STALE";
-
-				// Fetch fresh data in background (don't await)
-				// This updates the cache for the next request
-				scrapeTeamWithRetry(teamId)
-					.then((freshData) => {
-						logger.info(
-							"[CACHE]",
-							`Background refresh completed for teamId: ${teamId}, updating cache`,
-						);
-						setCachedData("team", teamId, freshData, CACHE_TTL);
-					})
-					.catch((error) => {
-						logger.error(
-							"[CACHE]",
-							`Background refresh failed for teamId: ${teamId}:`,
-							error,
-						);
-					});
-			} else {
-				// No cache at all, need to scrape
-				logger.info(
-					"[CACHE]",
-					`Cache MISS - need to scrape for teamId: ${teamId}`,
-				);
-				data = await scrapeTeamWithRetry(teamId);
-				cacheStatus = "MISS";
-
-				// Store in cache with 5-minute TTL
-				logger.info(
-					"[CACHE]",
-					`Storing data in cache with TTL: ${CACHE_TTL}ms for teamId: ${teamId}`,
-				);
-				setCachedData("team", teamId, data, CACHE_TTL);
-				logger.info("[CACHE]", "Data stored successfully");
-			}
-		}
-	}
-
-	// Type guard: data should never be null at this point, but TypeScript can't guarantee it
-	// This is a safety check in case of unexpected code paths
-	if (!data) {
-		throw new Error(
-			`Unexpected null data for teamId: ${teamId}. This should never happen.`,
-		);
-	}
-
-	return { data, cacheStatus };
-}
+export const getTeamData = async (
+  teamId: string,
+  grabLive = false
+): Promise<GetDataResult> => await readSnapshot("team", teamId, grabLive);

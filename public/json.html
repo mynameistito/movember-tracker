@@ -1,52 +1,55 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Movember Donation Tracker - JSON API</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-900 text-gray-200 p-5 font-sans">
-  <div class="max-w-4xl mx-auto">
-    <div id="content">
-      <div class="text-green-500 text-center py-10">Loading...</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Movember Donation Tracker - JSON API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-900 p-5 font-sans text-gray-200">
+    <div class="mx-auto max-w-4xl">
+      <div id="content">
+        <div class="py-10 text-center text-green-500">Loading...</div>
+      </div>
     </div>
-  </div>
-  <script type="module">
-    import { DEFAULT_MEMBER_ID, getData, getTeamData } from './js/bundle.js';
+    <script type="module">
+      import { DEFAULT_MEMBER_ID, getData, getTeamData } from "./js/bundle.js";
 
-    // Get memberId or teamId from URL query parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const teamId = urlParams.get('teamId') || urlParams.get('teamid');
-    const memberId = urlParams.get('memberId') || urlParams.get('memberid') || (teamId ? null : DEFAULT_MEMBER_ID);
-    const grabLive = urlParams.has('grab-live');
+      // Get memberId or teamId from URL query parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const teamId = urlParams.get("teamId") || urlParams.get("teamid");
+      const memberId =
+        urlParams.get("memberId") ||
+        urlParams.get("memberid") ||
+        (teamId ? null : DEFAULT_MEMBER_ID);
+      const grabLive = urlParams.has("grab-live");
 
-    async function loadData() {
-      const contentDiv = document.getElementById('content');
-      
-      try {
-        const { data } = teamId 
-          ? await getTeamData(teamId, grabLive)
-          : await getData(memberId, grabLive);
-        
-        // Display as JSON
-        contentDiv.innerHTML = `<pre class="bg-black border border-gray-800 rounded-lg p-5 font-mono text-green-500 text-sm overflow-x-auto leading-relaxed">${JSON.stringify(data, null, 2)}</pre>`;
-        
-        // Set content type header via meta tag (for browser display)
-        document.querySelector('meta[name="description"]') || document.createElement('meta');
-      } catch (error) {
-        contentDiv.innerHTML = `
+      async function loadData() {
+        const contentDiv = document.getElementById("content");
+
+        try {
+          const { data } = teamId
+            ? await getTeamData(teamId, grabLive)
+            : await getData(memberId, grabLive);
+
+          // Display as JSON
+          contentDiv.innerHTML = `<pre class="bg-black border border-gray-800 rounded-lg p-5 font-mono text-green-500 text-sm overflow-x-auto leading-relaxed">${JSON.stringify(data, null, 2)}</pre>`;
+
+          // Set content type header via meta tag (for browser display)
+          document.querySelector('meta[name="description"]') ||
+            document.createElement("meta");
+        } catch (error) {
+          contentDiv.innerHTML = `
           <div class="text-red-500 bg-red-500/10 border border-red-500 rounded-lg p-5 my-5">
             <h2 class="text-xl font-semibold mb-2">Error</h2>
-            <p>${error.message || 'Failed to fetch data'}</p>
+            <p>${error.message || "Failed to fetch data"}</p>
           </div>
         `;
+        }
       }
-    }
 
-    // Load data on page load
-    loadData();
-  </script>
-</body>
+      // Load data on page load
+      loadData();
+    </script>
+  </body>
 </html>
-

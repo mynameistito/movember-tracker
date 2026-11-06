@@ -1,198 +1,182 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import {
-	clearSubdomainCache,
-	getCachedData,
-	getCachedSubdomain,
-	setCachedData,
-	setCachedSubdomain,
-} from "../public/js/bundle.js";
-
-// Mock localStorage
-const localStorageMock = (() => {
-	let store = {};
-
-	return {
-		getItem: (key) => store[key] || null,
-		setItem: (key, value) => {
-			store[key] = value.toString();
-		},
-		removeItem: (key) => {
-			delete store[key];
-		},
-		clear: () => {
-			store = {};
-		},
-	};
-})();
-
-// Mock logger to avoid console output during tests
-vi.mock("../src/client/logger.js", () => ({
-	default: {
-		debug: vi.fn(),
-		info: vi.fn(),
-		warn: vi.fn(),
-		error: vi.fn(),
-	},
-}));
+  clearSubdomainCache,
+  getCachedData,
+  getCachedSubdomain,
+  setCachedData,
+  setCachedSubdomain,
+} from "../src/client/cache.ts";
 
 describe("cache.js", () => {
-	beforeEach(() => {
-		// Clear localStorage before each test
-		localStorageMock.clear();
-		// Replace global localStorage with mock
-		global.localStorage = localStorageMock;
-	});
+  beforeEach(() => {
+    // Clear localStorage before each test
+    localStorage.clear();
+  });
 
-	describe("getCachedData and setCachedData", () => {
-		it("should store and retrieve cached data", () => {
-			const memberId = "12345";
-			const data = {
-				amount: "$1,234.56",
-				currency: "USD",
-				subdomain: "us",
-				timestamp: Date.now(),
-			};
-			const ttl = 300000; // 5 minutes
+  describe("getCachedData and setCachedData", () => {
+    it("should store and retrieve cached data", () => {
+      const memberId = "12345";
 
-			setCachedData(memberId, data, ttl);
-			const cached = getCachedData(memberId);
+      const data = {
+        amount: "$1,234.56",
+        currency: "USD",
+        subdomain: "us",
+        timestamp: Date.now(),
+      };
 
-			expect(cached).toEqual(data);
-		});
+      const ttl = 300_000;
 
-		it("should return null for non-existent cache", () => {
-			const cached = getCachedData("nonexistent");
-			expect(cached).toBeNull();
-		});
+      setCachedData("member", memberId, data, ttl);
+      const cached = getCachedData("member", memberId);
 
-		it("should return null for expired cache", () => {
-			const memberId = "12345";
-			const data = {
-				amount: "$1,234.56",
-				currency: "USD",
-				subdomain: "us",
-				timestamp: Date.now() - 600000, // 10 minutes ago
-			};
-			const ttl = 300000; // 5 minutes
+      expect(cached).toStrictEqual(data);
+    });
 
-			setCachedData(memberId, data, ttl);
-			// Manually expire the cache by setting cachedAt to past
-			const cacheKey = `movember:data:${memberId}`;
-			const cacheValue = {
-				data,
-				cachedAt: Date.now() - 600000, // 10 minutes ago
-				ttl,
-			};
-			localStorageMock.setItem(cacheKey, JSON.stringify(cacheValue));
+    it("should return null for non-existent cache", () => {
+      const cached = getCachedData("member", "nonexistent");
+      expect(cached).toBeNull();
+    });
 
-			const cached = getCachedData(memberId);
-			expect(cached).toBeNull();
-		});
+    it("should return null for expired cache", () => {
+      const memberId = "12345";
 
-		it("should handle invalid JSON gracefully", () => {
-			const memberId = "12345";
-			const cacheKey = `movember:data:${memberId}`;
-			localStorageMock.setItem(cacheKey, "invalid json");
+      const data = {
+        amount: "$1,234.56",
+        currency: "USD",
+        subdomain: "us",
+        timestamp: Date.now() - 600_000,
+      };
 
-			const cached = getCachedData(memberId);
-			expect(cached).toBeNull();
-		});
-	});
+      const ttl = 300_000;
 
-	describe("getCachedSubdomain and setCachedSubdomain", () => {
-		it("should store and retrieve cached subdomain", () => {
-			const memberId = "12345";
-			const subdomain = "uk";
-			const ttl = 86400000; // 24 hours
+      setCachedData("member", memberId, data, ttl);
+      // Manually expire the cache by setting cachedAt to past
+      const cacheKey = `movember:data:member:${memberId}`;
 
-			setCachedSubdomain(memberId, subdomain, ttl);
-			const cached = getCachedSubdomain(memberId);
+      const cacheValue = {
+        data,
+        cachedAt: Date.now() - 600_000,
+        ttl,
+      };
 
-			expect(cached).toBe(subdomain);
-		});
+      localStorage.setItem(cacheKey, JSON.stringify(cacheValue));
 
-		it("should return null for non-existent subdomain cache", () => {
-			const cached = getCachedSubdomain("nonexistent");
-			expect(cached).toBeNull();
-		});
+      const cached = getCachedData("member", memberId);
+      expect(cached).toBeNull();
+    });
 
-		it("should store subdomain independently of data cache", () => {
-			const memberId = "12345";
-			const data = {
-				amount: "$1,234.56",
-				currency: "USD",
-				timestamp: Date.now(),
-			};
-			const dataTtl = 300000; // 5 minutes
-			const subdomainTtl = 86400000; // 24 hours
+    it("should handle invalid JSON gracefully", () => {
+      const memberId = "12345";
+      const cacheKey = `movember:data:member:${memberId}`;
+      localStorage.setItem(cacheKey, "invalid json");
 
-			setCachedData(memberId, data, dataTtl);
-			setCachedSubdomain(memberId, "uk", subdomainTtl);
+      const cached = getCachedData("member", memberId);
+      expect(cached).toBeNull();
+    });
+  });
 
-			// Subdomain should be stored separately and retrievable
-			const cachedSubdomain = getCachedSubdomain(memberId);
-			expect(cachedSubdomain).toBe("uk");
+  describe("getCachedSubdomain and setCachedSubdomain", () => {
+    it("should store and retrieve cached subdomain", () => {
+      const memberId = "12345";
+      const subdomain = "uk";
+      const ttl = 86_400_000;
 
-			// Data cache should remain unchanged (subdomain not in data)
-			const cachedData = getCachedData(memberId);
-			expect(cachedData).toEqual(data);
-			expect(cachedData.subdomain).toBeUndefined();
-		});
+      setCachedSubdomain("member", memberId, subdomain, ttl);
+      const cached = getCachedSubdomain("member", memberId);
 
-		it("should return null for expired subdomain cache", () => {
-			const memberId = "12345";
-			const subdomain = "uk";
-			const ttl = 86400000; // 24 hours
+      expect(cached).toBe(subdomain);
+    });
 
-			setCachedSubdomain(memberId, subdomain, ttl);
-			// Manually expire the subdomain cache by setting cachedAt to past
-			const subdomainKey = `movember:subdomain:${memberId}`;
-			const cacheValue = {
-				subdomain,
-				cachedAt: Date.now() - 90000000, // 25 hours ago
-				ttl,
-			};
-			localStorageMock.setItem(subdomainKey, JSON.stringify(cacheValue));
+    it("should return null for non-existent subdomain cache", () => {
+      const cached = getCachedSubdomain("member", "nonexistent");
+      expect(cached).toBeNull();
+    });
 
-			const cached = getCachedSubdomain(memberId);
-			expect(cached).toBeNull();
-		});
-	});
+    it("should store subdomain independently of data cache", () => {
+      const memberId = "12345";
 
-	describe("clearSubdomainCache", () => {
-		it("should clear cached data for a member", () => {
-			const memberId = "12345";
-			const data = {
-				amount: "$1,234.56",
-				currency: "USD",
-				subdomain: "us",
-				timestamp: Date.now(),
-			};
-			const ttl = 300000;
+      const data = {
+        amount: "$1,234.56",
+        currency: "USD",
+        subdomain: "us",
+        timestamp: Date.now(),
+      };
 
-			setCachedData(memberId, data, ttl);
-			clearSubdomainCache(memberId);
+      const dataTtl = 300_000;
+      const subdomainTtl = 86_400_000;
 
-			const cached = getCachedData(memberId);
-			expect(cached).toBeNull();
-		});
+      setCachedData("member", memberId, data, dataTtl);
+      setCachedSubdomain("member", memberId, "uk", subdomainTtl);
 
-		it("should clear subdomain cache", () => {
-			const memberId = "12345";
-			const subdomain = "uk";
-			const ttl = 86400000;
+      // Subdomain should be stored separately and retrievable
+      const cachedSubdomain = getCachedSubdomain("member", memberId);
+      expect(cachedSubdomain).toBe("uk");
 
-			setCachedSubdomain(memberId, subdomain, ttl);
-			clearSubdomainCache(memberId);
+      // Updating the routing cache preserves the snapshot country.
+      const cachedData = getCachedData("member", memberId);
+      expect(cachedData).toStrictEqual(data);
+      expect(cachedData.subdomain).toBe("us");
+    });
 
-			const cached = getCachedSubdomain(memberId);
-			expect(cached).toBeNull();
-		});
+    it("should return null for expired subdomain cache", () => {
+      const memberId = "12345";
+      const subdomain = "uk";
+      const ttl = 86_400_000;
 
-		it("should handle clearing non-existent cache gracefully", () => {
-			expect(() => {
-				clearSubdomainCache("nonexistent");
-			}).not.toThrow();
-		});
-	});
+      setCachedSubdomain("member", memberId, subdomain, ttl);
+      // Manually expire the subdomain cache by setting cachedAt to past
+      const subdomainKey = `movember:subdomain:member:${memberId}`;
+
+      const cacheValue = {
+        subdomain,
+        cachedAt: Date.now() - 90_000_000,
+        ttl,
+      };
+
+      localStorage.setItem(subdomainKey, JSON.stringify(cacheValue));
+
+      const cached = getCachedSubdomain("member", memberId);
+      expect(cached).toBeNull();
+    });
+  });
+
+  describe(clearSubdomainCache, () => {
+    it("should clear cached data for a member", () => {
+      const memberId = "12345";
+
+      const data = {
+        amount: "$1,234.56",
+        currency: "USD",
+        subdomain: "us",
+        timestamp: Date.now(),
+      };
+
+      const ttl = 300_000;
+
+      setCachedData("member", memberId, data, ttl);
+      clearSubdomainCache("member", memberId);
+
+      const cached = getCachedData("member", memberId);
+      expect(cached).toBeNull();
+    });
+
+    it("should clear subdomain cache", () => {
+      const memberId = "12345";
+      const subdomain = "uk";
+      const ttl = 86_400_000;
+
+      setCachedSubdomain("member", memberId, subdomain, ttl);
+      clearSubdomainCache("member", memberId);
+
+      const cached = getCachedSubdomain("member", memberId);
+      expect(cached).toBeNull();
+    });
+
+    it("should handle clearing non-existent cache gracefully", () => {
+      expect(() => {
+        clearSubdomainCache("member", "nonexistent");
+      }).not.toThrow();
+    });
+  });
 });

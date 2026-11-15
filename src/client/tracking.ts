@@ -21,6 +21,7 @@ const isRetryable = (cause: unknown): boolean => {
 export interface TrackingInput {
   readonly type: "member" | "team";
   readonly id: string;
+  readonly url?: string;
 }
 
 /** A scrape failed; callers may retain the last successful snapshot. */
@@ -50,8 +51,8 @@ export const trackingLayer = Layer.sync(Tracking, () => {
     const data = yield* Effect.tryPromise({
       try: async (signal) =>
         input.type === "team"
-          ? await scrapeTeamPage(input.id, true, signal)
-          : await scrapeMovemberPage(input.id, true, signal),
+          ? await scrapeTeamPage(input.id, true, signal, input.url)
+          : await scrapeMovemberPage(input.id, true, signal, input.url),
       catch: (cause) =>
         new TrackingError({
           retryable: isRetryable(cause),

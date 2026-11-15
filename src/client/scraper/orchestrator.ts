@@ -79,28 +79,32 @@ const scrapeFundraiser = async (
   type: "member" | "team",
   id: string,
   clearOn404: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sourceUrl?: string
 ): Promise<ScrapedData> => {
   const started = Date.now();
   let subdomain: string | undefined;
   let url: string | undefined;
 
   try {
-    const country =
-      type === "team"
-        ? await getSubdomainForTeam(id, signal)
-        : await getSubdomainForMember(id, signal);
+    let country: string;
+
+    if (sourceUrl === undefined) {
+      country =
+        type === "team"
+          ? await getSubdomainForTeam(id, signal)
+          : await getSubdomainForMember(id, signal);
+    } else {
+      country = extractSubdomainFromUrl(sourceUrl) ?? "nz";
+    }
 
     subdomain = country;
     url = fundraiserUrl(type, id, country);
 
-    const { html, finalUrl } = await loadFundraiser(
-      type,
-      id,
-      country,
-      clearOn404,
-      signal
-    );
+    const { html, finalUrl } =
+      sourceUrl === undefined
+        ? await loadFundraiser(type, id, country, clearOn404, signal)
+        : await fetchViaProxy(sourceUrl, signal);
 
     subdomain = extractSubdomainFromUrl(finalUrl) ?? country;
     url = finalUrl;
@@ -124,7 +128,10 @@ const scrapeFundraiser = async (
       timestamp: Date.now(),
     };
 
-    if (isValidNumber(target)) {
+    if (
+      isValidNumber(target) &&
+      Number(parseAmount(target, subdomain).value.replaceAll(",", "")) > 0
+    ) {
       const goal = parseAmount(target, subdomain).value;
       data.target = `${symbol}${goal}`;
       data.percentage = calculatePercentage(value, goal);
@@ -199,6 +206,7 @@ export interface GetDataResult {
 /**
  * Scrape the Movember page using Worker's CORS proxy and HTML parsing
  * @param id - The member ID to scrape
+ * @param sourceUrl - Explicit regional fundraiser page URL.
  * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
  * @param signal - Cancels discovery and fetching.
  * @returns The scraped data
@@ -207,9 +215,10 @@ export interface GetDataResult {
 export const scrapeMovemberPage = async (
   id: string,
   clearSubdomainOn404 = false,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sourceUrl?: string
 ): Promise<ScrapedData> =>
-  await scrapeFundraiser("member", id, clearSubdomainOn404, signal);
+  await scrapeFundraiser("member", id, clearSubdomainOn404, signal, sourceUrl);
 
 /**
  * Retry wrapper with exponential backoff
@@ -223,6 +232,7 @@ export const scrapeWithRetry = async (id: string): Promise<ScrapedData> =>
 /**
  * Scrape the Movember team page using Worker's CORS proxy and HTML parsing
  * @param id - The team ID to scrape
+ * @param sourceUrl - Explicit regional fundraiser page URL.
  * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
  * @param signal - Cancels discovery and fetching.
  * @returns The scraped data
@@ -231,9 +241,10 @@ export const scrapeWithRetry = async (id: string): Promise<ScrapedData> =>
 export const scrapeTeamPage = async (
   id: string,
   clearSubdomainOn404 = false,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sourceUrl?: string
 ): Promise<ScrapedData> =>
-  await scrapeFundraiser("team", id, clearSubdomainOn404, signal);
+  await scrapeFundraiser("team", id, clearSubdomainOn404, signal, sourceUrl);
 
 /**
  * Retry wrapper with exponential backoff for teams

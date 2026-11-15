@@ -1,5 +1,34 @@
 import { DEFAULT_MEMBER_ID } from "./constants.js";
+import { parseFundraiserUrl } from "./fundraiser-url.js";
 import { observeTracking } from "./tracking-query.js";
+import type { TrackingInput } from "./tracking.js";
+
+const trackingInput = (params: URLSearchParams): TrackingInput | null => {
+  const source = params.get("url");
+  const fundraiser = source === null ? null : parseFundraiserUrl(source);
+
+  const teamId =
+    [params.get("teamId"), params.get("teamid")].find(
+      (value) => value !== null && value !== ""
+    ) ?? null;
+
+  const memberId =
+    [params.get("memberId"), params.get("memberid")].find(
+      (value) => value !== null && value !== ""
+    ) ?? DEFAULT_MEMBER_ID;
+
+  const id = fundraiser?.id ?? teamId ?? memberId;
+
+  if (!/^\d+$/u.test(id) || (source !== null && fundraiser === null)) {
+    return null;
+  }
+
+  if (fundraiser !== null) {
+    return fundraiser;
+  }
+
+  return { type: teamId === null ? "member" : "team", id };
+};
 
 const mount = (): void => {
   const container = document.querySelector<HTMLElement>("#overlayContainer");
@@ -19,17 +48,7 @@ const mount = (): void => {
 
   const params = new URLSearchParams(location.search);
 
-  const teamId =
-    [params.get("teamId"), params.get("teamid")].find(
-      (value) => value !== null && value !== ""
-    ) ?? null;
-
-  const memberId =
-    [params.get("memberId"), params.get("memberid")].find(
-      (value) => value !== null && value !== ""
-    ) ?? DEFAULT_MEMBER_ID;
-
-  const id = teamId ?? memberId;
+  const input = trackingInput(params);
   const position = params.get("location")?.toLowerCase() ?? "bottomright";
   container.dataset.position = [
     "topleft",
@@ -46,32 +65,28 @@ const mount = (): void => {
       ? Math.min(Math.max(seconds, 30), 3600) * 1000
       : 300_000;
 
-  if (/^\d+$/u.test(id)) {
-    const dispose = observeTracking(
-      { type: teamId === null ? "member" : "team", id },
-      interval,
-      (data, failed) => {
-        status.textContent = failed ? "Connection interrupted · retrying" : "";
-
-        if (!data) {
-          amount.textContent = failed ? "Temporarily unavailable" : "Loading…";
-
-          return;
-        }
-
-        amount.textContent = data.amount;
-        target.textContent =
-          data.target === undefined ? "" : `Goal ${data.target}`;
-        const percentage = Math.min(100, Math.max(0, data.percentage ?? 0));
-        progress.style.width = `${percentage}%`;
-        track.setAttribute("aria-valuenow", String(percentage));
-      }
-    );
-
-    window.addEventListener("pagehide", dispose, { once: true });
-  } else {
+  if (input === null) {
     amount.textContent = "Invalid Movember ID";
     status.textContent = "Use a numeric memberId or teamId in the overlay URL.";
+  } else {
+    const dispose = observeTracking(input, interval, (data, failed) => {
+      status.textContent = failed ? "Connection interrupted · retrying" : "";
+
+      if (!data) {
+        amount.textContent = failed ? "Temporarily unavailable" : "Loading…";
+
+        return;
+      }
+
+      amount.textContent = data.amount;
+      target.textContent =
+        data.target === undefined ? "" : `Goal ${data.target}`;
+      const percentage = Math.min(100, Math.max(0, data.percentage ?? 0));
+      progress.style.width = `${percentage}%`;
+      track.setAttribute("aria-valuenow", String(percentage));
+    });
+
+    window.addEventListener("pagehide", dispose, { once: true });
   }
 };
 

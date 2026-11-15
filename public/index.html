@@ -44,6 +44,18 @@
         <section>
           <h2>Set up your overlay</h2>
           <form id="setup">
+            <label for="fundraiser-url">Movember page URL</label>
+            <input
+              id="fundraiser-url"
+              name="url"
+              type="url"
+              placeholder="https://au.movember.com/mospace/13728913"
+              aria-describedby="url-help"
+            />
+            <p class="help" id="url-help">
+              Paste your member or team page URL to use its country and
+              currency. Or enter an ID below.
+            </p>
             <label for="tracking-type">Track</label
             ><select id="tracking-type" name="type">
               <option value="member">A member</option>

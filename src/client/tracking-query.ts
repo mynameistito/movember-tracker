@@ -22,7 +22,7 @@ export const observeTracking = (
   client.mount();
 
   const observer = new QueryObserver(client, {
-    queryKey: ["donations", input.type, input.id],
+    queryKey: ["donations", input.type, input.id, input.url],
     queryFn: async ({ signal }) =>
       await Effect.runPromise(
         Effect.gen(function* queryFn() {
@@ -32,7 +32,10 @@ export const observeTracking = (
         }).pipe(Effect.provide(trackingLayer)),
         { signal }
       ),
-    initialData: getStaleCachedData(input.type, input.id) ?? undefined,
+    initialData:
+      input.url === undefined
+        ? (getStaleCachedData(input.type, input.id) ?? undefined)
+        : undefined,
     initialDataUpdatedAt: 0,
     staleTime: interval,
     refetchInterval: interval,

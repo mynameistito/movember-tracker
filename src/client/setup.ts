@@ -1,4 +1,5 @@
 import { DEFAULT_MEMBER_ID } from "./constants.js";
+import { parseFundraiserUrl } from "./fundraiser-url.js";
 
 const mount = (): void => {
   const form = document.querySelector<HTMLFormElement>("#setup");
@@ -18,6 +19,10 @@ const mount = (): void => {
     return;
   }
 
+  const source = document.querySelector<HTMLInputElement>("#fundraiser-url");
+  source?.addEventListener("input", () => {
+    id.required = source.value.trim() === "";
+  });
   const params = new URLSearchParams(location.search);
 
   const teamId =
@@ -48,12 +53,32 @@ const mount = (): void => {
       return;
     }
 
+    const fundraiser =
+      source !== null && source.value.trim() !== ""
+        ? parseFundraiserUrl(source.value)
+        : null;
+
+    if (source !== null && source.value.trim() !== "" && fundraiser === null) {
+      feedback.textContent = "Enter an HTTPS Movember member or team page URL.";
+
+      return;
+    }
+
     const values = new FormData(form);
     const url = new URL("/overlay", location.origin);
     url.searchParams.set(
       type.value === "team" ? "teamId" : "memberId",
       id.value
     );
+
+    if (fundraiser) {
+      url.searchParams.delete("memberId");
+      url.searchParams.delete("teamId");
+      url.searchParams.set("url", fundraiser.url);
+      type.value = fundraiser.type;
+      id.value = fundraiser.id;
+    }
+
     const position = values.get("location");
     const refresh = values.get("interval");
     url.searchParams.set(

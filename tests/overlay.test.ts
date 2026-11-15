@@ -106,4 +106,29 @@ describe("stream overlay", () => {
       "Invalid Movember ID"
     );
   });
+
+  it.each([
+    "https://au.movember.com/mospace/13728913",
+    "https://nz.movember.com/team/2470730",
+  ])("loads the supplied regional URL %s without discovery", async (url) => {
+    history.replaceState({}, "", `/overlay?url=${encodeURIComponent(url)}`);
+    const destinations: string[] = [];
+    vi.stubGlobal("fetch", async (request: string) => {
+      destinations.push(
+        new URL(request, location.origin).searchParams.get("url") ?? ""
+      );
+
+      return await Promise.resolve(
+        new Response(donationPage(0).replace("$200", "$0"), {
+          headers: { "X-Final-URL": url },
+        })
+      );
+    });
+    await import("../src/client/overlay");
+    await vi.waitFor(() => {
+      expect(document.querySelector("#amount")?.textContent).toBe("$0");
+    });
+    expect(destinations).toStrictEqual([url]);
+    expect(document.querySelector("#target")?.textContent).toBe("");
+  });
 });

@@ -6,11 +6,11 @@
 
 // Log levels (higher number = more important)
 const LOG_LEVELS = {
-	DEBUG: 0,
-	INFO: 1,
-	WARN: 2,
-	ERROR: 3,
-	NONE: 4,
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+  NONE: 4,
 } as const;
 
 type LogLevel = keyof typeof LOG_LEVELS;
@@ -19,143 +19,159 @@ type LogLevel = keyof typeof LOG_LEVELS;
 let currentLogLevel: number = LOG_LEVELS.INFO;
 
 // Initialize log level from localStorage or default
-function initializeLogLevel(): void {
-	try {
-		const stored = localStorage.getItem("LOG_LEVEL");
-		if (stored) {
-			const level = stored.toUpperCase() as LogLevel;
-			if (level in LOG_LEVELS) {
-				currentLogLevel = LOG_LEVELS[level];
-				return;
-			}
-		}
-	} catch (error) {
-		// localStorage unavailable (e.g., in private browsing mode)
-		// Log to console as fallback since logger isn't initialized yet
-		if (typeof console !== "undefined" && console.warn) {
-			console.warn(
-				"[LOGGER] localStorage unavailable, using default log level:",
-				error instanceof Error ? error.message : String(error),
-			);
-		}
-	}
+const initializeLogLevel = (): void => {
+  try {
+    const stored = localStorage.getItem("LOG_LEVEL");
 
-	// Default to INFO in production, DEBUG in development
-	// You can detect development mode via URL or other means
-	const isDevelopment =
-		window.location.hostname === "localhost" ||
-		window.location.hostname === "127.0.0.1" ||
-		window.location.search.includes("debug=true");
+    if (stored !== null && stored !== undefined && stored !== "") {
+      const level = Object.entries(LOG_LEVELS).find(
+        ([name]) => name === stored.toUpperCase()
+      );
 
-	currentLogLevel = isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
-}
+      if (level) {
+        [, currentLogLevel] = level;
+
+        return;
+      }
+    }
+  } catch (error) {
+    // localStorage unavailable (e.g., in private browsing mode)
+    // Log to console as fallback since logger isn't initialized yet
+    if (typeof console !== "undefined" && Boolean(console.warn)) {
+      console.warn(
+        "[LOGGER] localStorage unavailable, using default log level:",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  // Default to INFO in production, DEBUG in development
+  // You can detect development mode via URL or other means
+  const isDevelopment =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.search.includes("debug=true");
+
+  currentLogLevel = isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
+};
 
 // Initialize on load
 initializeLogLevel();
 
-/**
- * Format log message with prefix
- */
-function formatMessage(
-	level: string,
-	prefix: string,
-	...args: unknown[]
-): unknown[] {
-	const timestamp = new Date().toISOString();
-	return [`[${timestamp}] [${level}] ${prefix}`, ...args];
-}
+// Format log message with prefix
+const formatMessage = (
+  level: string,
+  prefix: string,
+  ...args: unknown[]
+): unknown[] => {
+  const timestamp = new Date().toISOString();
 
-/**
- * Check if log level should be output
- */
-function shouldLog(level: LogLevel): boolean {
-	return LOG_LEVELS[level] >= currentLogLevel;
-}
+  return [`[${timestamp}] [${level}] ${prefix}`, ...args];
+};
+
+// Check if log level should be output
+const shouldLog = (level: LogLevel): boolean =>
+  LOG_LEVELS[level] >= currentLogLevel;
 
 /**
  * Logger object with methods for each log level
  */
 export const logger = {
-	/**
-	 * Set the log level
-	 * @param level - One of: 'DEBUG', 'INFO', 'WARN', 'ERROR', 'NONE'
-	 */
-	setLevel(level: string): void {
-		const upperLevel = level.toUpperCase() as LogLevel;
-		if (upperLevel in LOG_LEVELS) {
-			currentLogLevel = LOG_LEVELS[upperLevel];
-			try {
-				localStorage.setItem("LOG_LEVEL", upperLevel);
-			} catch (error) {
-				// localStorage unavailable - log using logger itself
-				// Use console as fallback if logger fails
-				try {
-					logger.warn(
-						"[LOGGER]",
-						"Failed to persist log level to localStorage:",
-						error instanceof Error ? error.message : String(error),
-					);
-				} catch {
-					// If logger also fails, use console directly
-					if (typeof console !== "undefined" && console.warn) {
-						console.warn(
-							"[LOGGER] Failed to persist log level:",
-							error instanceof Error ? error.message : String(error),
-						);
-					}
-				}
-			}
-		}
-	},
+  /**
+   * Set the log level
+   * @param level - One of: 'DEBUG', 'INFO', 'WARN', 'ERROR', 'NONE'
+   */
+  setLevel(level: string): void {
+    const upperLevel = level.toUpperCase();
 
-	/**
-	 * Get the current log level
-	 * @returns Current log level name
-	 */
-	getLevel(): string {
-		for (const [name, value] of Object.entries(LOG_LEVELS)) {
-			if (value === currentLogLevel) {
-				return name;
-			}
-		}
-		return "INFO";
-	},
+    const configuredLevel = Object.entries(LOG_LEVELS).find(
+      ([name]) => name === upperLevel
+    );
 
-	/**
-	 * Debug level logging (most verbose)
-	 */
-	debug(prefix: string, ...args: unknown[]): void {
-		if (shouldLog("DEBUG")) {
-			console.debug(...formatMessage("DEBUG", prefix, ...args));
-		}
-	},
+    if (configuredLevel) {
+      [, currentLogLevel] = configuredLevel;
 
-	/**
-	 * Info level logging (default)
-	 */
-	info(prefix: string, ...args: unknown[]): void {
-		if (shouldLog("INFO")) {
-			console.log(...formatMessage("INFO", prefix, ...args));
-		}
-	},
+      try {
+        localStorage.setItem("LOG_LEVEL", upperLevel);
+      } catch (error) {
+        // localStorage unavailable - log using logger itself
+        // Use console as fallback if logger fails
+        try {
+          logger.warn(
+            "[LOGGER]",
+            "Failed to persist log level to localStorage:",
+            error instanceof Error ? error.message : String(error)
+          );
+        } catch {
+          // If logger also fails, use console directly
+          if (typeof console !== "undefined" && Boolean(console.warn)) {
+            console.warn(
+              "[LOGGER] Failed to persist log level:",
+              error instanceof Error ? error.message : String(error)
+            );
+          }
+        }
+      }
+    }
+  },
 
-	/**
-	 * Warning level logging
-	 */
-	warn(prefix: string, ...args: unknown[]): void {
-		if (shouldLog("WARN")) {
-			console.warn(...formatMessage("WARN", prefix, ...args));
-		}
-	},
+  /**
+   * Get the current log level
+   * @returns Current log level name
+   */
+  getLevel(): string {
+    for (const [name, value] of Object.entries(LOG_LEVELS)) {
+      if (value === currentLogLevel) {
+        return name;
+      }
+    }
 
-	/**
-	 * Error level logging
-	 */
-	error(prefix: string, ...args: unknown[]): void {
-		if (shouldLog("ERROR")) {
-			console.error(...formatMessage("ERROR", prefix, ...args));
-		}
-	},
+    return "INFO";
+  },
+
+  /**
+   * Debug level logging (most verbose)
+   * @param prefix - Scraping stage or diagnostic category.
+   * @param args - Values to include in the console record.
+   */
+  debug(prefix: string, ...args: unknown[]): void {
+    if (shouldLog("DEBUG")) {
+      console.debug(...formatMessage("DEBUG", prefix, ...args));
+    }
+  },
+
+  /**
+   * Info level logging (default)
+   * @param prefix - Scraping stage or diagnostic category.
+   * @param args - Values to include in the console record.
+   */
+  info(prefix: string, ...args: unknown[]): void {
+    if (shouldLog("INFO")) {
+      console.log(...formatMessage("INFO", prefix, ...args));
+    }
+  },
+
+  /**
+   * Warning level logging
+   * @param prefix - Scraping stage or diagnostic category.
+   * @param args - Values to include in the console record.
+   */
+  warn(prefix: string, ...args: unknown[]): void {
+    if (shouldLog("WARN")) {
+      console.warn(...formatMessage("WARN", prefix, ...args));
+    }
+  },
+
+  /**
+   * Error level logging
+   * @param prefix - Scraping stage or diagnostic category.
+   * @param args - Values to include in the console record.
+   */
+  error(prefix: string, ...args: unknown[]): void {
+    if (shouldLog("ERROR")) {
+      console.error(...formatMessage("ERROR", prefix, ...args));
+    }
+  },
 };
 
 // Export default logger

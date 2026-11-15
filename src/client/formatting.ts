@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+
 /**
  * Format duration in human-readable format
  * @param ms - Duration in milliseconds
@@ -7,14 +9,15 @@
  * formatDuration(45000) // "45s (45000ms)"
  */
 export const formatDuration = (ms: number): string => {
-	const seconds = Math.round(ms / 1000);
-	const minutes = Math.floor(seconds / 60);
-	const remainingSeconds = seconds % 60;
+  const seconds = Math.round(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
 
-	if (minutes > 0) {
-		return `${minutes}m ${remainingSeconds}s (${ms}ms)`;
-	}
-	return `${seconds}s (${ms}ms)`;
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s (${ms}ms)`;
+  }
+
+  return `${seconds}s (${ms}ms)`;
 };
 
 /**
@@ -24,5 +27,6 @@ export const formatDuration = (ms: number): string => {
  * @example
  * await sleep(1000); // Sleep for 1 second
  */
-export const sleep = (ms: number): Promise<void> =>
-	new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = async (ms: number): Promise<void> => {
+  await Effect.runPromise(Effect.sleep(ms));
+};

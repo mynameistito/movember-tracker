@@ -1,0 +1,87 @@
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: white;
+  background: transparent;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: transparent;
+}
+#overlayContainer {
+  position: absolute;
+  width: 600px;
+  padding: 24px 28px;
+  background: rgba(15, 27, 21, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+#overlayContainer[data-position="bottomright"] {
+  bottom: 50px;
+  right: 50px;
+}
+#overlayContainer[data-position="bottomleft"] {
+  bottom: 50px;
+  left: 50px;
+}
+#overlayContainer[data-position="topright"] {
+  top: 50px;
+  right: 50px;
+}
+#overlayContainer[data-position="topleft"] {
+  top: 50px;
+  left: 50px;
+}
+.totals {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+p {
+  margin: 0;
+}
+.label {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: #c5d2c7;
+  margin-bottom: 10px;
+}
+#amount {
+  font-size: 48px;
+  letter-spacing: -0.04em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+#target {
+  color: #c5d2c7;
+  font-size: 20px;
+  white-space: nowrap;
+  padding-bottom: 5px;
+}
+.track {
+  height: 12px;
+  background: #405247;
+  border-radius: 4px;
+  overflow: hidden;
+}
+#progressBar {
+  width: 0;
+  height: 100%;
+  background: #b7e399;
+  transition: width 0.5s ease;
+}
+#status {
+  font-size: 12px;
+  color: #dce2d8;
+  margin-top: 10px;
+  min-height: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  #progressBar {
+    transition: none;
+  }
+}

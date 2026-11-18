@@ -35,6 +35,15 @@ export class ProxyRequestError extends Error {
   }
 }
 
+/**
+ * Reports whether the proxy status leaves one region unable to serve the page.
+ *
+ * @param error - Proxy failure thrown while fetching a regional Movember page.
+ * @returns True for a missing page or a region origin that fails.
+ */
+export const isRegionUnavailable = (error: ProxyRequestError): boolean =>
+  error.status === 404 || error.status >= 500;
+
 /** HTML response and the destination after validated proxy redirects. */
 export interface FetchResult {
   html: string;

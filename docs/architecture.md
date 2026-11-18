@@ -29,7 +29,7 @@ The Effect inventory consists of one Tracking tag and one production Layer, colo
 
 ## Failure and cache behavior
 
-Query acquisition now enables wrong-country recovery after a 404. HTTP status crosses the proxy interface, so country discovery can distinguish missing regional pages from access refusal. A non-404 proxy failure stops discovery instead of probing every country.
+Query acquisition recovers a wrong or dead region when a page is missing (404) or a region host fails with 5xx. HTTP status crosses the proxy interface, so country discovery can distinguish an unusable region from access refusal. Discovery skips a 404 or 5xx region, and stops on a 4xx access refusal or a network failure instead of probing every country.
 
 Expired donation snapshots survive fresh-cache misses. Regression tests cover stale publication and subsequent background replacement for both members and teams. A pending-fetch regression verifies observer disposal aborts acquisition without publishing a snapshot.
 

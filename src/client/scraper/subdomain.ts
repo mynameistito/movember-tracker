@@ -19,6 +19,7 @@ import {
   buildTeamUrl,
   extractSubdomainFromUrl,
   fetchViaProxy,
+  isRegionUnavailable,
   ProxyRequestError,
 } from "./network.js";
 
@@ -148,7 +149,7 @@ const probeCountry = async (
   } catch (error) {
     signal?.throwIfAborted();
 
-    if (!(error instanceof ProxyRequestError) || error.status !== 404) {
+    if (!(error instanceof ProxyRequestError) || !isRegionUnavailable(error)) {
       throw error;
     }
 

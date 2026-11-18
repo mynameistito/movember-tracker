@@ -27,6 +27,8 @@ import {
   buildTeamUrl,
   extractSubdomainFromUrl,
   fetchViaProxy,
+  isRegionUnavailable,
+  ProxyRequestError,
 } from "./network.js";
 import {
   detectSubdomainForMember,
@@ -42,43 +44,77 @@ const fundraiserUrl = (
 ): string =>
   type === "team" ? buildTeamUrl(id, country) : buildMovemberUrl(id, country);
 
+const resolveRegion = async (
+  type: "member" | "team",
+  id: string,
+  failedCountry: string,
+  error: Error,
+  signal?: AbortSignal
+) => {
+  clearSubdomainCache(type, id);
+
+  const detected =
+    type === "team"
+      ? await detectSubdomainForTeam(id, true, signal)
+      : await detectSubdomainForMember(id, true, signal);
+
+  if (detected === failedCountry) {
+    throw error;
+  }
+
+  return await fetchViaProxy(fundraiserUrl(type, id, detected), signal);
+};
+
 const loadFundraiser = async (
   type: "member" | "team",
   id: string,
   country: string,
-  clearOn404: boolean,
+  recoverRegion: boolean,
   signal?: AbortSignal
 ) => {
   try {
     return await fetchViaProxy(fundraiserUrl(type, id, country), signal);
   } catch (error) {
     if (
-      !clearOn404 ||
-      !(error instanceof Error) ||
-      !error.message.includes("404")
+      !recoverRegion ||
+      !(error instanceof ProxyRequestError) ||
+      !isRegionUnavailable(error)
     ) {
       throw error;
     }
 
-    clearSubdomainCache(type, id);
+    return await resolveRegion(type, id, country, error, signal);
+  }
+};
 
-    const detected =
-      type === "team"
-        ? await detectSubdomainForTeam(id, true, signal)
-        : await detectSubdomainForMember(id, true, signal);
-
-    if (detected === country) {
+const loadSourcePage = async (
+  sourceUrl: string,
+  type: "member" | "team",
+  id: string,
+  sourceCountry: string,
+  recoverRegion: boolean,
+  signal?: AbortSignal
+) => {
+  try {
+    return await fetchViaProxy(sourceUrl, signal);
+  } catch (error) {
+    if (
+      !recoverRegion ||
+      !(error instanceof ProxyRequestError) ||
+      !isRegionUnavailable(error)
+    ) {
       throw error;
     }
 
-    return await fetchViaProxy(fundraiserUrl(type, id, detected), signal);
+    // The configured page host can have no origin; use the id's own region.
+    return await resolveRegion(type, id, sourceCountry, error, signal);
   }
 };
 
 const scrapeFundraiser = async (
   type: "member" | "team",
   id: string,
-  clearOn404: boolean,
+  recoverRegion: boolean,
   signal?: AbortSignal,
   sourceUrl?: string
 ): Promise<ScrapedData> => {
@@ -103,8 +139,15 @@ const scrapeFundraiser = async (
 
     const { html, finalUrl } =
       sourceUrl === undefined
-        ? await loadFundraiser(type, id, country, clearOn404, signal)
-        : await fetchViaProxy(sourceUrl, signal);
+        ? await loadFundraiser(type, id, country, recoverRegion, signal)
+        : await loadSourcePage(
+            sourceUrl,
+            type,
+            id,
+            country,
+            recoverRegion,
+            signal
+          );
 
     subdomain = extractSubdomainFromUrl(finalUrl) ?? country;
     url = finalUrl;
@@ -160,7 +203,7 @@ const scrapeFundraiser = async (
 const retryScrape = async (
   type: "member" | "team",
   id: string,
-  scrape: (id: string, clearOn404: boolean) => Promise<ScrapedData>
+  scrape: (id: string, recoverRegion: boolean) => Promise<ScrapedData>
 ): Promise<ScrapedData> =>
   await Effect.runPromise(
     Effect.tryPromise({
@@ -207,18 +250,18 @@ export interface GetDataResult {
  * Scrape the Movember page using Worker's CORS proxy and HTML parsing
  * @param id - The member ID to scrape
  * @param sourceUrl - Explicit regional fundraiser page URL.
- * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
+ * @param recoverRegion - Whether to re-resolve the region when its page is missing
  * @param signal - Cancels discovery and fetching.
  * @returns The scraped data
  * @throws {Error} If scraping fails
  */
 export const scrapeMovemberPage = async (
   id: string,
-  clearSubdomainOn404 = false,
+  recoverRegion = false,
   signal?: AbortSignal,
   sourceUrl?: string
 ): Promise<ScrapedData> =>
-  await scrapeFundraiser("member", id, clearSubdomainOn404, signal, sourceUrl);
+  await scrapeFundraiser("member", id, recoverRegion, signal, sourceUrl);
 
 /**
  * Retry wrapper with exponential backoff
@@ -233,18 +276,18 @@ export const scrapeWithRetry = async (id: string): Promise<ScrapedData> =>
  * Scrape the Movember team page using Worker's CORS proxy and HTML parsing
  * @param id - The team ID to scrape
  * @param sourceUrl - Explicit regional fundraiser page URL.
- * @param clearSubdomainOn404 - Whether to clear subdomain cache on 404 errors
+ * @param recoverRegion - Whether to re-resolve the region when its page is missing
  * @param signal - Cancels discovery and fetching.
  * @returns The scraped data
  * @throws {Error} If scraping fails
  */
 export const scrapeTeamPage = async (
   id: string,
-  clearSubdomainOn404 = false,
+  recoverRegion = false,
   signal?: AbortSignal,
   sourceUrl?: string
 ): Promise<ScrapedData> =>
-  await scrapeFundraiser("team", id, clearSubdomainOn404, signal, sourceUrl);
+  await scrapeFundraiser("team", id, recoverRegion, signal, sourceUrl);
 
 /**
  * Retry wrapper with exponential backoff for teams
